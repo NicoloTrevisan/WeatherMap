@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cycling Wind Analysis with Popups</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        #map { height: 600px; background: #e8f4f8; }
+        .controls { margin: 10px; padding: 10px; background: white; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        .wind-marker {
+            font-size: 32px;
+            font-weight: bold;
+            color: #FF0000;
+            text-shadow: -1px -1px 0 #FFF, 1px -1px 0 #FFF, -1px 1px 0 #FFF, 1px 1px 0 #FFF;
+            transform-origin: center;
+            display: block;
+            text-align: center;
+        }
+        .route-line { 
+            color: #0066CC;
+            weight: 5;
+            opacity: 0.9;
+            dashArray: "6,4";
+        }
+        .stats-box {
+            margin: 10px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <input type="file" id="gpxFile" accept=".gpx">
+        <label>Start Time: <input type="datetime-local" id="startTime" required></label>
+        <label>Speed (km/h): 
+            <select id="avgSpeed">
+                <option>10</option><option>15</option><option>20</option>
+                <option selected>22</option><option>25</option>
+                <option>30</option><option>35</option>
+            </select>
+        </label>
+        <button onclick="processGPX()">Process GPX</button>
+    </div>
+    <div id="map"></div>
+    <div class="stats-box" id="stats"></div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map, trackLayer;
+
+        L.Polyline.include({
+            getDistance: function() {
+                return this.getLatLngs().reduce((acc, pt, i, arr) => 
+                    i > 0 ? acc + arr[i-1].distanceTo(pt) : acc, 0);
+            },
+            getPointAtDistance: function(target) {
+                let dist = 0;
+                const pts = this.getLatLngs();
+                for(let i = 1; i < pts.length; i++) {
+                    const segment = pts[i-1].distanceTo(pts[i]);
+                    if(dist + segment >= target) {
+                        const frac = (target - dist) / segment;
+                        return L.latLng(
+                            pts[i-1].lat + frac * (pts[i].lat - pts[i-1].lat),
+                            pts[i-1].lng + frac * (pts[i].lng - pts[i-1].lng)
+                        );
+                    }
+                    dist += segment;
+                }
+                return null;
+            }
+        });
+
+        function initMap() {
+            map = L.map('map').setView([50.8503, 4.3517], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            document.getElementById('startTime').value = new Date().toISOString().slice(0, 16);
+        }
+        initMap();
+
+        async function processGPX() {
+            try {
+                const file = document.getElementById('gpxFile').files[0];
+                const startTime = document.getElementById('startTime').value;
+                const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
+                
+                if (!file) throw new Error('Please select a GPX file');
+                if (!startTime) throw new Error('Please select a start time');
+
+                if (trackLayer) map.removeLayer(trackLayer);
+                map.eachLayer(layer => layer instanceof L.Marker && map.removeLayer(layer));
+
+                const points = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        try {
+                            const gpx = new DOMParser().parseFromString(e.target.result, "text/xml");
+                            const trackPoints = Array.from(gpx.getElementsByTagName('trkpt'));
+                            resolve(trackPoints.map(pt => L.latLng(
+                                parseFloat(pt.getAttribute('lat')),
+                                parseFloat(pt.getAttribute('lon'))
+                            )));
+                        } catch (error) {
+                            reject(new Error('Invalid GPX file format'));
+                        }
+                    };
+                    reader.readAsText(file);
+                });
+
+                trackLayer = L.polyline(points, {
+                    className: 'route-line',
+                    color: '#0066CC',
+                    weight: 5,
+                    dashArray: '6,4'
+                }).addTo(map);
+                map.fitBounds(trackLayer.getBounds());
+
+                const totalDistance = trackLayer.getDistance();
+                const windPoints = [];
+                for(let dist = 10000; dist <= totalDistance; dist += 10000) {
+                    const point = trackLayer.getPointAtDistance(dist);
+                    if(point) windPoints.push({ latlng: point, distance: dist });
+                }
+
+                document.getElementById('stats').innerHTML = `
+                    <div>Total: ${windPoints.length * 10} km</div>
+                    <div>Duration: ${(windPoints.length * 10 / avgSpeed).toFixed(1)} h</div>
+                    <div>Avg Speed: ${avgSpeed} km/h</div>
+                `;
+
+                for (const point of windPoints) {
+                    try {
+                        const km = point.distance / 1000;
+                        const estTime = new Date(new Date(startTime).getTime() + (km / avgSpeed) * 3600000);
+                        
+                        const windData = await fetch(
+                            `https://api.openweathermap.org/data/2.5/forecast?lat=${point.latlng.lat}&lon=${point.latlng.lng}&units=metric&appid=154dc010adbb10c0549d6d077e64b073`
+                        ).then(r => r.json());
+
+                        L.marker(point.latlng, {
+                            icon: L.divIcon({
+                                className: 'wind-marker',
+                                iconSize: [40, 40],
+                                html: `<div style="transform: rotate(${windData.list[0].wind.deg}deg)">→</div>`
+                            })
+                        }).addTo(map).bindPopup(`
+                            <b>${km.toFixed(0)} km Mark</b><hr>
+                            <b>Wind Speed:</b> ${windData.list[0].wind.speed} m/s<br>
+                            <b>Direction:</b> ${degreesToCompass(windData.list[0].wind.deg)} (${windData.list[0].wind.deg}°)<br>
+                            <b>Estimated Time:</b> ${estTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                        `);
+                        
+                    } catch (error) {
+                        console.warn('Wind data error:', error);
+                    }
+                }
+
+            } catch (error) {
+                document.getElementById('stats').innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        function degreesToCompass(degrees) {
+            const directions = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+            return directions[Math.round((degrees % 360) / 22.5) % 16];
+        }
+    </script>
+</body>
+</html>
