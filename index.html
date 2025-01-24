@@ -1,49 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cycling Wind Analysis with Popups</title>
+    <title>Cycling Route Planner</title>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
-        #map { height: 600px; background: #e8f4f8; }
-        .controls { margin: 10px; padding: 10px; background: white; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-        .wind-marker {
-            font-size: 32px;
-            font-weight: bold;
-            color: #FF0000;
-            text-shadow: -1px -1px 0 #FFF, 1px -1px 0 #FFF, -1px 1px 0 #FFF, 1px 1px 0 #FFF;
-            transform-origin: center;
-            display: block;
-            text-align: center;
-        }
-        .route-line {
-            color: #0066CC;
-            weight: 5;
-            opacity: 0.9;
-            dashArray: "6,4";
-        }
-        .stats-box {
-            margin: 10px;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.9);
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        #map { height: 70vh; width: 100%; background: #e8f4f8; }
+        .controls { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
+        .input-group { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+        input, select, button { 
+            padding: 12px; 
+            font-size: 16px; 
+            border: 1px solid #ced4da;
             border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-            font-family: Arial, sans-serif;
+            width: 100%;
+            -webkit-appearance: none;
+        }
+        button { background: #007bff; color: white; font-weight: 500; }
+        button:active { background: #0056b3; }
+        .wind-marker { 
+            font-size: 28px; 
+            font-weight: bold;
+            text-shadow: -1px -1px 0 #FFF, 1px -1px 0 #FFF, -1px 1px 0 #FFF, 1px 1px 0 #FFF;
+        }
+        .route-line { color: #007bff; weight: 5; opacity: 0.9; }
+        .stats-box { padding: 16px; background: white; border-top: 1px solid #dee2e6; font-size: 14px; }
+        .autocomplete-items { 
+            position: absolute; 
+            width: calc(100% - 24px);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            margin-top: 4px;
+        }
+        .autocomplete-item { padding: 12px; border-bottom: 1px solid #eee; line-height: 1.4; }
+        .autocomplete-item:last-child { border-bottom: none; }
+        .autocomplete-item:hover { background: #f8f9fa; }
+        .error-message { color: #dc3545; padding: 8px; }
+        #fileName { padding: 8px; color: #6c757d; }
+
+        @media (min-width: 768px) {
+            #map { height: 600px; }
+            .input-group { flex-direction: row; flex-wrap: wrap; }
+            .input-group > * { flex: 1 1 200px; }
+            input[type="text"] { min-width: 250px; }
         }
     </style>
 </head>
 <body>
     <div class="controls">
-        <input type="file" id="gpxFile" accept=".gpx">
-        <label>Start Time: <input type="datetime-local" id="startTime" required></label>
-        <label>Speed (km/h):
+        <div class="input-group">
+            <input type="file" id="gpxFile" accept=".gpx" hidden>
+            <button onclick="document.getElementById('gpxFile').click()">Load GPX File</button>
+            <span id="fileName"></span>
+        </div>
+        <div class="input-group">
+            <input type="text" id="startLocation" placeholder="Start Address" autocomplete="off">
+            <input type="text" id="endLocation" placeholder="End Address" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <input type="datetime-local" id="startTime" required>
             <select id="avgSpeed">
                 <option>10</option><option>15</option><option>20</option>
                 <option selected>22</option><option>25</option>
                 <option>30</option><option>35</option>
             </select>
-        </label>
-        <button onclick="processGPX()">Process GPX</button>
+            <select id="terrainType">
+                <option value="asphalt">Asphalt</option>
+                <option value="mixed">Mixed</option>
+            </select>
+            <button onclick="processInput()">Analyze Route</button>
+        </div>
     </div>
     <div id="map"></div>
     <div class="stats-box" id="stats"></div>
@@ -51,10 +84,11 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
         let map, trackLayer;
-
+        
+        // Polyline extensions
         L.Polyline.include({
             getDistance: function() {
-                return this.getLatLngs().reduce((acc, pt, i, arr) =>
+                return this.getLatLngs().reduce((acc, pt, i, arr) => 
                     i > 0 ? acc + arr[i-1].distanceTo(pt) : acc, 0);
             },
             getPointAtDistance: function(target) {
@@ -75,105 +109,295 @@
             }
         });
 
+        const GRAPHHOPPER_KEY = '594dca35-3715-43ea-ac3b-fd23dc58808a';
+        const OPENWEATHER_KEY = '154dc010adbb10c0549d6d077e64b073';
+
+        function debounce(func, timeout = 300) {
+            let timer;
+            return (...args) => {
+                clearTimeout(timer);
+                timer = setTimeout(() => { func.apply(this, args); }, timeout);
+            };
+        }
+
         function initMap() {
-            map = L.map('map').setView([50.8503, 4.3517], 5);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+            map = L.map('map').setView([48.8566, 2.3522], isMobile ? 12 : 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
             document.getElementById('startTime').value = new Date().toISOString().slice(0, 16);
+            document.getElementById('gpxFile').addEventListener('change', function(e) {
+                document.getElementById('fileName').textContent = e.target.files[0].name;
+            });
+
+            ['startLocation', 'endLocation'].forEach(id => {
+                const input = document.getElementById(id);
+                input.addEventListener('input', debounce(function(e) {
+                    handleAutocomplete(e.target.value, input);
+                }));
+                input.addEventListener('touchstart', e => e.preventDefault());
+            });
+
+            window.addEventListener('resize', () => map.invalidateSize());
         }
         initMap();
 
-        async function processGPX() {
+        async function handleAutocomplete(query, inputField) {
+            if(query.length < 3) return;
+            
             try {
-                const file = document.getElementById('gpxFile').files[0];
-                const startTime = document.getElementById('startTime').value;
-                const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
+                const existingList = inputField.parentNode.querySelector('.autocomplete-items');
+                if(existingList) existingList.remove();
 
-                if (!file) throw new Error('Please select a GPX file');
-                if (!startTime) throw new Error('Please select a start time');
+                const loading = document.createElement('div');
+                loading.className = 'autocomplete-item';
+                loading.textContent = 'Loading...';
+                inputField.parentNode.appendChild(loading);
+                
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?` +
+                    `format=json&q=${encodeURIComponent(query)}` +
+                    `&addressdetails=1&accept-language=en` +
+                    `&countrycodes=de,fr,it,es,nl,be,ch,at,pt,se,no,dk,fi,pl,ie,cz,hu,ro,gr` +
+                    `&dedupe=1&polygon_text=0&type=city,town,village,locality,road`
+                );
+                
+                const data = await response.json();
+                loading.remove();
 
-                if (trackLayer) map.removeLayer(trackLayer);
-                map.eachLayer(layer => layer instanceof L.Marker && map.removeLayer(layer));
+                const filteredResults = data
+                    .filter(item => !['waterway', 'house', 'pedestrian', 'hotel'].includes(item.type))
+                    .sort((a, b) => (a.importance > b.importance ? -1 : 1))
+                    .slice(0, 5);
 
-                const points = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = e => {
-                        try {
-                            const gpx = new DOMParser().parseFromString(e.target.result, "text/xml");
-                            const trackPoints = Array.from(gpx.getElementsByTagName('trkpt'));
-                            resolve(trackPoints.map(pt => L.latLng(
-                                parseFloat(pt.getAttribute('lat')),
-                                parseFloat(pt.getAttribute('lon'))
-                            )));
-                        } catch (error) {
-                            reject(new Error('Invalid GPX file format'));
-                        }
+                const list = document.createElement('div');
+                list.className = 'autocomplete-items';
+                
+                filteredResults.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'autocomplete-item';
+                    
+                    const mainText = document.createElement('div');
+                    mainText.style.fontWeight = '500';
+                    mainText.textContent = item.display_name.split(',')[0];
+                    
+                    const subText = document.createElement('div');
+                    subText.style.fontSize = '0.9em';
+                    subText.style.color = '#6c757d';
+                    subText.textContent = item.display_name.split(',').slice(1).join(',').trim();
+                    
+                    div.appendChild(mainText);
+                    div.appendChild(subText);
+                    
+                    div.onclick = () => {
+                        inputField.value = item.display_name;
+                        list.remove();
                     };
-                    reader.readAsText(file);
+                    div.ontouchstart = e => {
+                        e.preventDefault();
+                        inputField.value = item.display_name;
+                        list.remove();
+                    };
+                    
+                    list.appendChild(div);
                 });
 
-                trackLayer = L.polyline(points, {
-                    className: 'route-line',
-                    color: '#0066CC',
-                    weight: 5,
-                    dashArray: '6,4'
-                }).addTo(map);
-                map.fitBounds(trackLayer.getBounds());
+                inputField.parentNode.appendChild(list);
+            } catch(error) {
+                showError('Address suggestions unavailable');
+            }
+        }
 
-                const totalDistance = trackLayer.getDistance();
-                const windPoints = [];
-                for(let dist = 10000; dist <= totalDistance; dist += 10000) {
-                    const point = trackLayer.getPointAtDistance(dist);
-                    if(point) windPoints.push({ latlng: point, distance: dist });
+        async function processInput() {
+            try {
+                const file = document.getElementById('gpxFile').files[0];
+                const start = document.getElementById('startLocation').value;
+                const end = document.getElementById('endLocation').value;
+                
+                if (trackLayer) map.removeLayer(trackLayer);
+                map.eachLayer(layer => layer instanceof L.Marker && map.removeLayer(layer));
+                document.getElementById('stats').innerHTML = '';
+
+                let points;
+                if(file) {
+                    points = await parseGPX(file);
+                } else if(start && end) {
+                    points = await calculateCyclingRoute(start, end);
+                } else {
+                    throw new Error('Please provide either a GPX file or both addresses');
                 }
 
-                document.getElementById('stats').innerHTML =
-                    `<div>Total: ${windPoints.length * 10} km</div>
-                    <div>Duration: ${(windPoints.length * 10 / avgSpeed).toFixed(1)} h</div>
-                    <div>Avg Speed: ${avgSpeed} km/h</div>
+                trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
+                map.fitBounds(trackLayer.getBounds());
+                await analyzeRoute(points);
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        async function parseGPX(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        const gpx = new DOMParser().parseFromString(e.target.result, "text/xml");
+                        const trackPoints = Array.from(gpx.getElementsByTagName('trkpt'));
+                        resolve(trackPoints.map(pt => L.latLng(
+                            parseFloat(pt.getAttribute('lat')),
+                            parseFloat(pt.getAttribute('lon'))
+                        )));
+                    } catch (error) {
+                        reject('Invalid GPX file format');
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        async function calculateCyclingRoute(start, end) {
+            try {
+                const startCoords = await geocodeLocation(start);
+                const endCoords = await geocodeLocation(end);
+                const terrainType = document.getElementById('terrainType').value;
+
+                const params = new URLSearchParams({
+                    vehicle: 'bike',
+                    elevation: true,
+                    points_encoded: false,
+                    key: GRAPHHOPPER_KEY,
+                    ...(terrainType === 'asphalt' && { 'ch.disable': 'true' })
+                });
+
+                const response = await fetch(
+                    `https://graphhopper.com/api/1/route?` +
+                    `point=${startCoords.lat},${startCoords.lon}&` +
+                    `point=${endCoords.lat},${endCoords.lon}&` +
+                    params
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Routing failed: ${errorData.message || response.statusText}`);
+                }
+
+                const data = await response.json();
+                return data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
+            } catch (error) {
+                showError(error.message);
+                throw error;
+            }
+        }
+
+        async function geocodeLocation(query) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                if(data.length === 0) throw new Error(`Location not found: ${query}`);
+                return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+            } catch (error) {
+                showError(error.message);
+                throw error;
+            }
+        }
+
+        async function analyzeRoute(points) {
+            try {
+                const startTime = new Date(document.getElementById('startTime').value);
+                const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
+                const totalDistance = trackLayer.getDistance();
+                let errorCount = 0;
+
+                document.getElementById('stats').innerHTML = `
+                    <div>Total Distance: ${(totalDistance/1000).toFixed(1)} km</div>
+                    <div>Estimated Duration: ${(totalDistance/1000/avgSpeed).toFixed(1)} hours</div>
+                    <div>Average Speed: ${avgSpeed} km/h</div>
+                    <div class="error-message" id="errorMessage"></div>
                 `;
 
-                const KEY_PARTS = [
-                  '154dc0','10adbb','10c054',
-                  '9d6d07','7e64b0','73'
-                ];
-                const API_KEY = KEY_PARTS.map(p => p.slice(0,6)).join('');
+                for(let dist = 10000; dist <= totalDistance; dist += 10000) {
+                    const point = trackLayer.getPointAtDistance(dist);
+                    if(!point) continue;
 
-
-                for (const point of windPoints) {
+                    const km = dist / 1000;
+                    const estTime = new Date(startTime.getTime() + (km / avgSpeed) * 3600000);
+                    
                     try {
-                        const km = point.distance / 1000;
-                        const estTime = new Date(new Date(startTime).getTime() + (km / avgSpeed) * 3600000);
+                        await new Promise(resolve => setTimeout(resolve, 100));
 
-                        const windData = await fetch(
-                            `https://api.openweathermap.org/data/2.5/forecast?lat=${point.latlng.lat}&lon=${point.latlng.lng}&units=metric&appid=${API_KEY}`
-                        ).then(r => r.json());
+                        const forecastResponse = await fetch(
+                            `https://api.openweathermap.org/data/2.5/forecast?lat=${point.lat}&lon=${point.lng}&units=metric&appid=${OPENWEATHER_KEY}`
+                        );
+                        
+                        if(!forecastResponse.ok) {
+                            const error = await forecastResponse.json();
+                            throw new Error(`Forecast API: ${error.message}`);
+                        }
+                        
+                        const forecastData = await forecastResponse.json();
+                        const estTimestamp = Math.floor(estTime.getTime() / 1000);
+                        
+                        let closestForecast = null;
+                        let minDiff = Infinity;
+                        forecastData.list.forEach(entry => {
+                            const diff = Math.abs(entry.dt - estTimestamp);
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                closestForecast = entry;
+                            }
+                        });
 
-                        L.marker(point.latlng, {
+                        if (!closestForecast || minDiff > 3 * 3600) {
+                            throw new Error('No forecast available for this time');
+                        }
+
+                        L.marker(point, {
                             icon: L.divIcon({
                                 className: 'wind-marker',
                                 iconSize: [40, 40],
-                                html: `<div style="transform: rotate(${windData.list[0].wind.deg}deg)">→</div>`
+                                html: `<div style="transform: rotate(${closestForecast.wind.deg + 180}deg)">↑</div>`
                             })
                         }).addTo(map).bindPopup(
                             `<b>${km.toFixed(0)} km Mark</b><hr>
-                            <b>Wind Speed:</b> ${windData.list[0].wind.speed} m/s<br>
-                            <b>Direction:</b> ${degreesToCompass(windData.list[0].wind.deg)} (${windData.list[0].wind.deg}°)<br>
-                            <b>Estimated Time:</b> ${estTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`
+                            <b>Temperature:</b> ${closestForecast.main.temp}°C<br>
+                            <b>Conditions:</b> ${closestForecast.weather[0].description}<br>
+                            <b>Wind Speed:</b> ${closestForecast.wind.speed} m/s<br>
+                            <b>Direction:</b> ${degreesToCompass(closestForecast.wind.deg)} (${closestForecast.wind.deg}°)<br>
+                            <b>Forecast Time:</b> ${new Date(closestForecast.dt * 1000).toLocaleString()}<br>
+                            <b>Your ETA:</b> ${estTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`
                         );
 
-                    } catch (error) {
-                        console.warn('Wind data error:', error);
+                    } catch(error) {
+                        errorCount++;
+                        console.error('Forecast Error:', error);
+                        document.getElementById('errorMessage').innerHTML = 
+                            `Failed to load forecast for ${errorCount} points. Check console for details.`;
+                        
+                        L.marker(point).addTo(map).bindPopup(`
+                            <b>${km.toFixed(0)} km Mark</b><hr>
+                            Forecast unavailable:<br>
+                            ${error.message}
+                        `);
                     }
                 }
-
             } catch (error) {
-                document.getElementById('stats').innerHTML = `Error: ${error.message}`;
+                showError(error.message);
             }
         }
 
         function degreesToCompass(degrees) {
             const directions = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
             return directions[Math.round((degrees % 360) / 22.5) % 16];
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = `Error: ${message}`;
+            document.getElementById('stats').appendChild(errorDiv);
+            console.error(message);
         }
     </script>
 </body>
