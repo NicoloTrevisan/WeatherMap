@@ -396,11 +396,23 @@
                 `;
 
                 // Markers every 10km
-                for(let dist = 10000; dist <= totalDistance; dist += 10000) {
-                    const point = trackLayer.getPointAtDistance(dist);
-                    if(!point) continue;
+                // Generate array of distances: start (0 km), every 10 km, and end point
+const distancesToMark = [0]; // Start with the beginning
 
-                    const km = dist / 1000;
+// Add intermediate points every 10 km up to (but not including) total distance
+for (let dist = 10000; dist < totalDistance; dist += 10000) {
+    distancesToMark.push(dist);
+}
+
+// Always include endpoint
+distancesToMark.push(totalDistance);
+
+// Now process all marked distances
+for (const dist of distancesToMark) {
+    const point = trackLayer.getPointAtDistance(dist);
+    if (!point) continue;
+
+    const km = dist / 1000;
                     const estTime = new Date(startTime.getTime() + (km / avgSpeed) * 3600000);
                     
                     try {
