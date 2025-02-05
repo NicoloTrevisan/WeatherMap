@@ -12,24 +12,91 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     
-    /* Desktop Sidebar Controls (left side) */
-    .controls {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 300px;
-      height: 100vh;
-      overflow-y: auto;
-      z-index: 1500;
-      padding: 12px;
-      background: rgba(248,249,250,0.95);
-      border-right: 1px solid #dee2e6;
-      transition: opacity 0.3s ease;
+    /* The container holds the sidebar (controls) and the map */
+    #container { height: 100vh; }
+    
+    /* Desktop layout: sidebar on left, map on right */
+    @media (min-width: 601px) {
+      #container {
+        position: relative;
+      }
+      .controls {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 300px;
+        height: 100vh;
+        overflow-y: auto;
+        z-index: 1500;
+        padding: 12px;
+        background: rgba(248,249,250,0.95);
+        border-right: 1px solid #dee2e6;
+        transition: opacity 0.3s ease;
+      }
+      .controls.hidden { display: none; }
+      #map {
+        position: absolute;
+        top: 0;
+        left: 300px;
+        right: 0;
+        bottom: 0;
+        background: #e8f4f8;
+        transition: left 0.3s ease;
+      }
+      /* Menu Toggle Button (desktop) positioned at bottom left */
+      #menuToggle {
+        position: absolute;
+        bottom: 10px;
+        left: 310px;
+        z-index: 3000;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
     }
-    /* When hidden, the sidebar is not displayed at all */
-    .controls.hidden {
-      display: none;
+    
+    /* Mobile layout: sidebar becomes a top bar and the map fills the rest */
+    @media (max-width: 600px) {
+      #container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      .controls {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+      }
+      /* On mobile, the sidebar is visible by default (and will auto-hide after analysis) */
+      .controls.hidden { display: none; }
+      #map {
+        flex: 1;
+        position: relative;
+        width: 100%;
+        background: #e8f4f8;
+      }
+      /* On mobile, place the menu toggle button fixed at the top right */
+      #menuToggle {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        left: auto;
+        z-index: 3000;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
     }
+    
+    /* Common controls content styles */
     .controls h2 { margin-bottom: 8px; font-size: 20px; color: #007bff; }
     .section { margin-bottom: 16px; }
     .section h3 { margin-bottom: 8px; font-size: 16px; color: #333; }
@@ -68,152 +135,83 @@
     .autocomplete-item:hover { background: #f8f9fa; }
     .error-message { color: #dc3545; padding: 8px; }
     #fileName { padding: 8px; color: #6c757d; }
-    
-    /* Map occupies remaining space */
-    #map {
-      position: absolute;
-      top: 0;
-      left: 300px;
-      right: 0;
-      bottom: 0;
-      background: #e8f4f8;
-      transition: left 0.3s ease;
-    }
-    
-    /* Menu Toggle Button */
-    #menuToggle {
-      position: absolute;
-      top: 10px;
-      /* For desktop, place it just right of the sidebar */
-      left: 310px;
-      z-index: 3000;
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      padding: 8px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    
-    /* Weather Toggle Icon (overlay on map) */
-    #weatherToggle {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      z-index: 3000;
-      background: rgba(255,255,255,0.9);
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-    #weatherToggle i {
-      font-size: 24px;
-      color: #007bff;
-    }
-    
-    /* Mobile Layout: when viewport is 600px or less */
-    @media (max-width: 600px) {
-      .controls {
-        position: relative;
-        width: 100%;
-        height: auto;
-        border-right: none;
-        border-bottom: 1px solid #dee2e6;
-      }
-      #map {
-        position: relative;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-      }
-      /* On mobile, auto-hide the sidebar by default */
-      .controls { display: none; }
-      /* Place the menu toggle button fixed at top right */
-      #menuToggle {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        left: auto;
-      }
-    }
   </style>
 </head>
 <body>
-  <!-- Sidebar Controls -->
-  <div class="controls" id="controls">
-    <h2>Cycling Route Planner</h2>
-    <div class="section">
-      <h3>Route Source</h3>
-      <div class="input-group">
-        <input type="file" id="gpxFile" accept=".gpx" hidden>
-        <button onclick="document.getElementById('gpxFile').click()">
-          <i class="fas fa-file-upload"></i> Load GPX File
-        </button>
-        <span id="fileName"></span>
-      </div>
-      <div class="input-group">
-        <input type="text" id="startLocation" placeholder="Start Address" autocomplete="off">
-        <input type="text" id="endLocation" placeholder="End Address" autocomplete="off">
-      </div>
-    </div>
-    <div class="section">
-      <h3>Route Settings</h3>
-      <div class="input-group">
-        <input type="datetime-local" id="startTime" required>
-      </div>
-      <div class="input-group">
-        <div>
-          <label for="avgSpeed"><i class="fas fa-tachometer-alt"></i> Average Speed (km/h)</label>
-          <select id="avgSpeed">
-            <option>10</option>
-            <option>15</option>
-            <option>20</option>
-            <option selected>22</option>
-            <option>25</option>
-            <option>30</option>
-            <option>35</option>
-          </select>
+  <div id="container">
+    <!-- Sidebar Controls -->
+    <div class="controls" id="controls">
+      <h2>Cycling Route Planner</h2>
+      <div class="section">
+        <h3>Route Source</h3>
+        <div class="input-group">
+          <input type="file" id="gpxFile" accept=".gpx" hidden>
+          <button onclick="document.getElementById('gpxFile').click()">
+            <i class="fas fa-file-upload"></i> Load GPX File
+          </button>
+          <span id="fileName"></span>
         </div>
-        <div>
-          <label for="datapointsCount"># Data Points for Forecast</label>
-          <select id="datapointsCount">
-            <option value="5">5</option>
-            <option value="10" selected>10</option>
-            <option value="20">20</option>
-            <option value="30">30</option>
-            <option value="50">50</option>
-          </select>
+        <div class="input-group">
+          <input type="text" id="startLocation" placeholder="Start Address" autocomplete="off">
+          <input type="text" id="endLocation" placeholder="End Address" autocomplete="off">
         </div>
       </div>
-      <div class="input-group">
-        <button onclick="processInput()">
-          <i class="fas fa-play"></i> Analyze Route
-        </button>
+      <div class="section">
+        <h3>Route Settings</h3>
+        <div class="input-group">
+          <input type="datetime-local" id="startTime" required>
+        </div>
+        <div class="input-group">
+          <div>
+            <label for="avgSpeed"><i class="fas fa-tachometer-alt"></i> Average Speed (km/h)</label>
+            <select id="avgSpeed">
+              <option>10</option>
+              <option>15</option>
+              <option>20</option>
+              <option selected>22</option>
+              <option>25</option>
+              <option>30</option>
+              <option>35</option>
+            </select>
+          </div>
+          <div>
+            <label for="datapointsCount"># Data Points for Forecast</label>
+            <select id="datapointsCount">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <button onclick="processInput()">
+            <i class="fas fa-play"></i> Analyze Route
+          </button>
+        </div>
+      </div>
+      <div class="section">
+        <h3>Actions</h3>
+        <div class="input-group">
+          <button onclick="clearMap()">
+            <i class="fas fa-trash"></i> Clear Map
+          </button>
+        </div>
+      </div>
+      <div class="section">
+        <h3>Statistics</h3>
+        <div class="stats-box" id="stats">
+          <!-- Stats will appear here after analysis -->
+        </div>
+      </div>
+      <div class="section">
+        <p>Right-click (or long-press) on the map to add an extra waypoint.<br>
+           Right-click on an extra waypoint to remove it.</p>
       </div>
     </div>
-    <div class="section">
-      <h3>Actions</h3>
-      <div class="input-group">
-        <button onclick="clearMap()">
-          <i class="fas fa-trash"></i> Clear Map
-        </button>
-      </div>
-    </div>
-    <div class="section">
-      <h3>Statistics</h3>
-      <div class="stats-box" id="stats">
-        <!-- Stats will be injected here after analysis -->
-      </div>
-    </div>
-    <div class="section">
-      <p>Right-click (or long-press) on the map to add an extra waypoint.<br>
-         Right-click on an extra waypoint to remove it.</p>
-    </div>
+    <!-- Map -->
+    <div id="map"></div>
   </div>
 
   <!-- Menu Toggle Button -->
@@ -223,8 +221,6 @@
   <div id="weatherToggle" onclick="toggleWeatherLayer()">
     <i class="fas fa-wind"></i>
   </div>
-
-  <div id="map"></div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -244,12 +240,11 @@
     // ========= INITIALIZATION =========
     function initMap() {
       const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-      // Disable default zoom control so we can re-add it in the desired position.
+      // Disable default zoom control; re-add in top right.
       map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], isMobile ? 12 : 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
-      // Add zoom control at top right
       L.control.zoom({ position: 'topright' }).addTo(map);
 
       document.getElementById('startTime').value = new Date().toISOString().slice(0, 16);
@@ -263,7 +258,7 @@
           handleAutocomplete(e.target.value, input);
         }));
       });
-      // Right-click (desktop) to add or remove extra waypoint
+      // Right-click (desktop) to add or remove an extra waypoint
       map.on('contextmenu', function(e) {
         e.originalEvent.preventDefault();
         let found = false;
@@ -283,27 +278,26 @@
           addStopMarker(e.latlng);
         }
       });
-      // Long-press (mobile) to add extra waypoint
+      // Long-press (mobile) to add an extra waypoint (only when exactly one touch is present)
       let touchTimer;
       map.getContainer().addEventListener('touchstart', function(e) {
-        touchTimer = setTimeout(() => {
-          const touch = e.touches[0];
-          const point = map.mouseEventToLatLng(touch);
-          addStopMarker(point);
-        }, 800);
+        if (e.touches.length === 1) {
+          touchTimer = setTimeout(() => {
+            const touch = e.touches[0];
+            const point = map.mouseEventToLatLng(touch);
+            addStopMarker(point);
+          }, 1500); // 1.5 seconds delay
+        }
       });
       map.getContainer().addEventListener('touchend', function(e) {
         clearTimeout(touchTimer);
       });
       window.addEventListener('resize', () => map.invalidateSize());
-      // Auto-hide sidebar on mobile
-      if (window.innerWidth <= 600) {
-        hideMenu();
-      }
+      // On mobile, do not auto-hide the menu on load; it will hide after analysis.
     }
     initMap();
 
-    // Polyline extension: compute total distance and return a point at a specified distance along the route
+    // Polyline extension: compute total distance and get point at a specified distance
     L.Polyline.include({
       getDistance: function() {
         return this.getLatLngs().reduce((acc, pt, i, arr) =>
@@ -402,7 +396,8 @@
         if(file) {
           const points = await parseGPX(file);
           trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
-          map.fitBounds(trackLayer.getBounds());
+          // Fit bounds with padding and a maximum zoom to focus on the route.
+          map.fitBounds(trackLayer.getBounds(), { padding: [20,20], maxZoom: 15 });
           await analyzeRoute(points);
         }
         // Otherwise, if addresses are provided, create fixed start/end markers
@@ -418,11 +413,13 @@
           endMarker.on('dragend', () => recalcRoute());
           waypoints.push(endMarker);
           const bounds = L.latLngBounds([startCoords, endCoords]);
-          map.fitBounds(bounds);
+          map.fitBounds(bounds, { padding: [20,20], maxZoom: 15 });
           recalcRoute();
         } else {
           throw new Error('Please provide either a GPX file or both addresses');
         }
+        // On mobile, hide the menu after route analysis.
+        if (window.innerWidth <= 600) { hideMenu(); }
       } catch (error) {
         showError(error.message);
       }
@@ -463,7 +460,7 @@
       try {
         const points = await calculateCyclingRoute(coordsArray);
         trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
-        map.fitBounds(trackLayer.getBounds());
+        map.fitBounds(trackLayer.getBounds(), { padding: [20,20], maxZoom: 15 });
         await analyzeRoute(points);
       } catch(e) {
         showError(e.message);
@@ -552,7 +549,7 @@
             createWeatherMarkers(closestForecast, point, km, estTime);
           } catch(error) {
             errorCount++;
-            document.getElementById('errorMessage').innerHTML = 
+            document.getElementById('errorMessage').innerHTML =
               `Failed to load forecast for ${errorCount} points. Check console for details.`;
             L.marker(point).addTo(map).bindPopup(`
               <b>${km.toFixed(0)} km Mark</b><hr>
@@ -562,7 +559,8 @@
           }
         }
         map.addLayer(windLayerGroup);
-        // Do not auto-hide the sidebar on desktop.
+        // On mobile, hide the menu after analysis.
+        if (window.innerWidth <= 600) { hideMenu(); }
       } catch (error) {
         showError(error.message);
       }
@@ -587,7 +585,7 @@
         <b>Your ETA:</b> ${estTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}<br>
         <b>Precipitation (3h):</b> ${rain} mm
       `;
-      // Wind Marker: rotate only the arrow; text stays horizontal.
+      // Wind Marker: rotate only the arrow icon; text stays horizontal.
       const windIcon = L.divIcon({
         className: 'wind-marker',
         iconSize: [40, 40],
@@ -666,7 +664,7 @@
 
     // ========= NEW: CLEAR MAP =========
     function clearMap() {
-      if(trackLayer) {
+      if (trackLayer) {
         map.removeLayer(trackLayer);
         trackLayer = null;
       }
@@ -717,12 +715,16 @@
     function hideMenu() {
       document.getElementById('controls').classList.add('hidden');
       document.getElementById('menuToggle').innerText = "Show Menu";
-      document.getElementById('map').style.left = "0";
+      if (window.innerWidth > 600) {
+        document.getElementById('map').style.left = "0";
+      }
     }
     function showMenu() {
       document.getElementById('controls').classList.remove('hidden');
       document.getElementById('menuToggle').innerText = "Hide Menu";
-      document.getElementById('map').style.left = "300px";
+      if (window.innerWidth > 600) {
+        document.getElementById('map').style.left = "300px";
+      }
     }
     function toggleMenu() {
       const controls = document.getElementById('controls');
