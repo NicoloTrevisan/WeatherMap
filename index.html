@@ -9,17 +9,19 @@
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    /* Global Styles */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     
-    /* The container holds the sidebar (controls) and the map */
-    #container { height: 100vh; }
+    /* Container: holds sidebar and map */
+    #container { 
+      height: 100vh; 
+      min-height: 0; 
+    }
     
-    /* Desktop layout: sidebar on left, map on right */
+    /* Desktop Layout: sidebar on left, map on right */
     @media (min-width: 601px) {
-      #container {
-        position: relative;
-      }
+      #container { position: relative; }
       .controls {
         position: absolute;
         top: 0;
@@ -32,6 +34,7 @@
         background: rgba(248,249,250,0.95);
         border-right: 1px solid #dee2e6;
         transition: opacity 0.3s ease;
+        min-height: 0;
       }
       .controls.hidden { display: none; }
       #map {
@@ -42,13 +45,28 @@
         bottom: 0;
         background: #e8f4f8;
         transition: left 0.3s ease;
+        height: 100vh;
+        min-height: 0;
       }
       /* Menu Toggle Button (desktop) positioned at bottom left */
       #menuToggle {
         position: absolute;
         bottom: 10px;
         left: 310px;
-        z-index: 3000;
+        z-index: 4000;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      /* Weather Toggle Icon for desktop */
+      #weatherToggle {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        z-index: 4000;
         background: rgba(0,0,0,0.7);
         color: #fff;
         padding: 8px 12px;
@@ -58,12 +76,13 @@
       }
     }
     
-    /* Mobile layout: sidebar becomes a top bar and the map fills the rest */
+    /* Mobile Layout: sidebar becomes a top bar and the map fills the rest */
     @media (max-width: 600px) {
       #container {
         display: flex;
         flex-direction: column;
         height: 100vh;
+        min-height: 0;
       }
       .controls {
         position: relative;
@@ -71,22 +90,35 @@
         height: auto;
         border-right: none;
         border-bottom: 1px solid #dee2e6;
+        min-height: 0;
       }
-      /* On mobile, the sidebar is visible by default (and will auto-hide after analysis) */
       .controls.hidden { display: none; }
       #map {
-        flex: 1;
+        flex: 1 1 auto;
         position: relative;
         width: 100%;
         background: #e8f4f8;
+        min-height: 0;
       }
-      /* On mobile, place the menu toggle button fixed at the top right */
+      /* On mobile, menu toggle button fixed at top right */
       #menuToggle {
         position: fixed;
         top: 10px;
         right: 10px;
-        left: auto;
-        z-index: 3000;
+        z-index: 4000;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      /* Weather Toggle Icon for mobile fixed at top left */
+      #weatherToggle {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 4000;
         background: rgba(0,0,0,0.7);
         color: #fff;
         padding: 8px 12px;
@@ -96,7 +128,7 @@
       }
     }
     
-    /* Common controls content styles */
+    /* Common Controls Content */
     .controls h2 { margin-bottom: 8px; font-size: 20px; color: #007bff; }
     .section { margin-bottom: 16px; }
     .section h3 { margin-bottom: 8px; font-size: 16px; color: #333; }
@@ -135,6 +167,61 @@
     .autocomplete-item:hover { background: #f8f9fa; }
     .error-message { color: #dc3545; padding: 8px; }
     #fileName { padding: 8px; color: #6c757d; }
+    
+    /* Tabs Styles */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .tabs button {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #007bff;
+      color: #fff;
+    }
+    .tabs button.active {
+      background: #0056b3;
+    }
+    .tab-content { margin-bottom: 16px; }
+    
+    /* Slider styling with range labels */
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      cursor: pointer;
+      background: #007bff;
+      border-radius: 4px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      border: 1px solid #007bff;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: -6px;
+    }
+    input[type="range"]:focus { outline: none; }
+    .range-labels {
+      font-size: 12px;
+      color: #6c757d;
+      text-align: center;
+      margin-top: 4px;
+    }
+    
+    /* Recommended Heading Marker Styles */
+    .recommended-heading { }
   </style>
 </head>
 <body>
@@ -142,27 +229,50 @@
     <!-- Sidebar Controls -->
     <div class="controls" id="controls">
       <h2>Cycling Route Planner</h2>
-      <div class="section">
-        <h3>Route Source</h3>
-        <div class="input-group">
-          <input type="file" id="gpxFile" accept=".gpx" hidden>
-          <button onclick="document.getElementById('gpxFile').click()">
-            <i class="fas fa-file-upload"></i> Load GPX File
-          </button>
-          <span id="fileName"></span>
-        </div>
-        <div class="input-group">
-          <input type="text" id="startLocation" placeholder="Start Address" autocomplete="off">
-          <input type="text" id="endLocation" placeholder="End Address" autocomplete="off">
+      <!-- Date & Time Header -->
+      <div class="section" id="datetime-section">
+        <label for="startTime">Departure Date & Time:</label>
+        <input type="datetime-local" id="startTime" required>
+      </div>
+      <!-- Tabs -->
+      <div class="tabs">
+        <button type="button" id="tabGenerateRouteBtn" onclick="showTab('generateRoute')">Generate Route</button>
+        <button type="button" id="tabRandomRouteBtn" onclick="showTab('generateRandom')">Random Route</button>
+        <button type="button" id="tabSettingsBtn" onclick="showTab('settings')">Settings</button>
+      </div>
+      <!-- Tab Contents -->
+      <div class="tab-content" id="generateRoute" style="display:block;">
+        <div class="section">
+          <h3>Generate Route</h3>
+          <div class="input-group">
+            <input type="text" id="startLocation" placeholder="Start Address" autocomplete="off">
+            <input type="text" id="endLocation" placeholder="End Address" autocomplete="off">
+          </div>
+          <div class="input-group">
+            <button onclick="processInput()">Generate Route</button>
+          </div>
         </div>
       </div>
-      <div class="section">
-        <h3>Route Settings</h3>
-        <div class="input-group">
-          <input type="datetime-local" id="startTime" required>
+      <div class="tab-content" id="generateRandom" style="display:none;">
+        <div class="section">
+          <h3>Generate Random Route</h3>
+          <div class="input-group">
+            <input type="text" id="randomLocation" placeholder="Random Route Location" autocomplete="off">
+          </div>
+          <div class="input-group">
+            <label for="routeLengthSlider">Desired Total Route Length (km): <span id="routeLengthValue">50 km</span></label>
+            <input type="range" id="routeLengthSlider" min="20" max="200" value="50" step="5">
+            <div class="range-labels">20 km — 200 km</div>
+          </div>
+          <div class="input-group">
+            <button onclick="bestRandomRouteGenerator()"><i class="fas fa-random"></i> Generate Best Random Route</button>
+          </div>
         </div>
-        <div class="input-group">
-          <div>
+      </div>
+      <div class="tab-content" id="settings" style="display:none;">
+        <div class="section">
+          <h3>Settings</h3>
+          <div class="input-group">
             <label for="avgSpeed"><i class="fas fa-tachometer-alt"></i> Average Speed (km/h)</label>
             <select id="avgSpeed">
               <option>10</option>
@@ -174,7 +284,7 @@
               <option>35</option>
             </select>
           </div>
-          <div>
+          <div class="input-group">
             <label for="datapointsCount"># Data Points for Forecast</label>
             <select id="datapointsCount">
               <option value="5">5</option>
@@ -185,24 +295,29 @@
             </select>
           </div>
         </div>
-        <div class="input-group">
-          <button onclick="processInput()">
-            <i class="fas fa-play"></i> Analyze Route
-          </button>
-        </div>
       </div>
+      <!-- GPX File Section -->
       <div class="section">
-        <h3>Actions</h3>
+        <h3>GPX File</h3>
         <div class="input-group">
-          <button onclick="clearMap()">
-            <i class="fas fa-trash"></i> Clear Map
+          <input type="file" id="gpxFile" accept=".gpx" hidden>
+          <button onclick="document.getElementById('gpxFile').click()">
+            <i class="fas fa-file-upload"></i> Load GPX File
           </button>
+          <span id="fileName"></span>
         </div>
       </div>
+      <!-- Clear Map Button -->
+      <div class="section">
+        <div class="input-group">
+          <button onclick="clearMap()"><i class="fas fa-trash"></i> Clear Map</button>
+        </div>
+      </div>
+      <!-- Statistics -->
       <div class="section">
         <h3>Statistics</h3>
         <div class="stats-box" id="stats">
-          <!-- Stats will appear here after analysis -->
+          <!-- Statistics and weather info will appear here -->
         </div>
       </div>
       <div class="section">
@@ -213,52 +328,86 @@
     <!-- Map -->
     <div id="map"></div>
   </div>
-
+  
   <!-- Menu Toggle Button -->
   <div id="menuToggle" onclick="toggleMenu()">Hide Menu</div>
-
+  
   <!-- Weather Toggle Icon -->
   <div id="weatherToggle" onclick="toggleWeatherLayer()">
     <i class="fas fa-wind"></i>
   </div>
-
+  
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
   <script>
-    // ========= GLOBALS =========
+    /* -------------------------
+       Define Custom Icons for Start/End
+       ------------------------- */
+    const startIcon = L.divIcon({
+      html: '<i class="fas fa-flag" style="color: green; font-size: 24px;"></i>',
+      iconSize: [24, 24],
+      className: ''
+    });
+    const endIcon = L.divIcon({
+      html: '<i class="fas fa-flag-checkered" style="color: red; font-size: 24px;"></i>',
+      iconSize: [24, 24],
+      className: ''
+    });
+    
+    /* -------------------------
+       TAB SWITCHING FUNCTIONS
+       ------------------------- */
+    function showTab(tabId) {
+      const contents = document.getElementsByClassName('tab-content');
+      for (let i = 0; i < contents.length; i++) {
+        contents[i].style.display = 'none';
+      }
+      document.getElementById(tabId).style.display = 'block';
+    }
+    
+    /* -------------------------
+       Global Variables & Initialization
+       ------------------------- */
     let map, trackLayer;
     let waypoints = []; // Contains fixed (start/end) and extra waypoints
     let windLayerGroup = L.layerGroup();
     let tempLayerGroup = L.layerGroup();
     let precipLayerGroup = L.layerGroup();
     let currentWeatherLayer = 'wind'; // Options: 'wind', 'temp', 'precip'
-
-    // API Keys (for your private use)
+    
     const GRAPHHOPPER_KEY = '594dca35-3715-43ea-ac3b-fd23dc58808a';
     const OPENWEATHER_KEY = '154dc010adbb10c0549d6d077e64b073';
-
-    // ========= INITIALIZATION =========
+    
     function initMap() {
       const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-      // Disable default zoom control; re-add in top right.
       map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], isMobile ? 12 : 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
       L.control.zoom({ position: 'topright' }).addTo(map);
-
+    
       document.getElementById('startTime').value = new Date().toISOString().slice(0, 16);
+    
+      document.getElementById('routeLengthSlider').addEventListener('input', function(e) {
+        document.getElementById('routeLengthValue').textContent = e.target.value + " km";
+      });
+    
+      ['startLocation', 'endLocation', 'randomLocation'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+          input.addEventListener('input', debounce(function(e) {
+            handleAutocomplete(e.target.value, input);
+          }));
+        }
+      });
+    
+      // When a GPX file is loaded, process and display the route immediately.
       document.getElementById('gpxFile').addEventListener('change', function(e) {
         document.getElementById('fileName').textContent = e.target.files[0].name;
+        processInput();
       });
-      // Autocomplete for addresses
-      ['startLocation', 'endLocation'].forEach(id => {
-        const input = document.getElementById(id);
-        input.addEventListener('input', debounce(function(e) {
-          handleAutocomplete(e.target.value, input);
-        }));
-      });
-      // Right-click (desktop) to add or remove an extra waypoint
+    
+      // Right-click (desktop) to add/remove an extra waypoint
       map.on('contextmenu', function(e) {
         e.originalEvent.preventDefault();
         let found = false;
@@ -274,11 +423,10 @@
             }
           }
         });
-        if (!found) {
-          addStopMarker(e.latlng);
-        }
+        if (!found) { addStopMarker(e.latlng); }
       });
-      // Long-press (mobile) to add an extra waypoint (only when exactly one touch is present)
+    
+      // Long-press (mobile) to add an extra waypoint (if one touch)
       let touchTimer;
       map.getContainer().addEventListener('touchstart', function(e) {
         if (e.touches.length === 1) {
@@ -286,18 +434,23 @@
             const touch = e.touches[0];
             const point = map.mouseEventToLatLng(touch);
             addStopMarker(point);
-          }, 1500); // 1.5 seconds delay
+          }, 1500);
         }
       });
       map.getContainer().addEventListener('touchend', function(e) {
         clearTimeout(touchTimer);
+        setTimeout(() => { map.invalidateSize(); }, 300);
       });
       window.addEventListener('resize', () => map.invalidateSize());
-      // On mobile, do not auto-hide the menu on load; it will hide after analysis.
+    
+      // Show default tab (Generate Route)
+      showTab('generateRoute');
     }
     initMap();
-
-    // Polyline extension: compute total distance and get point at a specified distance
+    
+    /* -------------------------
+       Polyline Extension
+       ------------------------- */
     L.Polyline.include({
       getDistance: function() {
         return this.getLatLngs().reduce((acc, pt, i, arr) =>
@@ -320,8 +473,10 @@
         return null;
       }
     });
-
-    // ========= AUTOCOMPLETE =========
+    
+    /* -------------------------
+       Autocomplete Function
+       ------------------------- */
     function debounce(func, timeout = 300) {
       let timer;
       return (...args) => {
@@ -329,12 +484,12 @@
         timer = setTimeout(() => { func.apply(this, args); }, timeout);
       };
     }
-
+    
     async function handleAutocomplete(query, inputField) {
-      if(query.length < 3) return;
+      if (query.length < 3) return;
       try {
         const existingList = inputField.parentNode.querySelector('.autocomplete-items');
-        if(existingList) existingList.remove();
+        if (existingList) existingList.remove();
         const loading = document.createElement('div');
         loading.className = 'autocomplete-items';
         loading.innerHTML = '<div class="autocomplete-item">Loading...</div>';
@@ -369,63 +524,94 @@
           list.appendChild(div);
         });
         inputField.parentNode.appendChild(list);
-      } catch(error) {
+      } catch (error) {
         showError('Address suggestions unavailable');
       }
     }
-
-    // ========= MAIN WORKFLOW =========
+    
+    /* -------------------------
+       Menu Toggle Functions
+       ------------------------- */
+    function hideMenu() {
+      document.getElementById('controls').classList.add('hidden');
+      document.getElementById('menuToggle').innerText = "Show Menu";
+      if (window.innerWidth > 600) { document.getElementById('map').style.left = "0"; }
+    }
+    function showMenu() {
+      document.getElementById('controls').classList.remove('hidden');
+      document.getElementById('menuToggle').innerText = "Hide Menu";
+      if (window.innerWidth > 600) { document.getElementById('map').style.left = "300px"; }
+    }
+    function toggleMenu() {
+      const controls = document.getElementById('controls');
+      if (controls.classList.contains('hidden')) { showMenu(); } else { hideMenu(); }
+    }
+    
+    /* -------------------------
+       Tab Switching Functions
+       ------------------------- */
+    function showTab(tabId) {
+      const contents = document.getElementsByClassName('tab-content');
+      for (let i = 0; i < contents.length; i++) {
+        contents[i].style.display = 'none';
+      }
+      document.getElementById(tabId).style.display = 'block';
+    }
+    
+    /* -------------------------
+       Route Generation Functions
+       ------------------------- */
     async function processInput() {
       try {
         const file = document.getElementById('gpxFile').files[0];
         const start = document.getElementById('startLocation').value.trim();
         const end = document.getElementById('endLocation').value.trim();
-        // Clear old data
         if (trackLayer) map.removeLayer(trackLayer);
         windLayerGroup.clearLayers();
         tempLayerGroup.clearLayers();
         precipLayerGroup.clearLayers();
-        map.eachLayer(layer => {
+        // Remove all markers (collect into an array first)
+        const markers = [];
+        map.eachLayer(function(layer) {
           if (layer instanceof L.Marker && !layer._isBaseLayer) {
-            map.removeLayer(layer);
+            markers.push(layer);
           }
         });
+        markers.forEach(marker => map.removeLayer(marker));
+    
         document.getElementById('stats').innerHTML = '';
         waypoints = [];
-        // If a GPX file is provided, parse it
-        if(file) {
+        if (file) {
           const points = await parseGPX(file);
           trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
-          // Fit bounds with padding and a maximum zoom to focus on the route.
-          map.fitBounds(trackLayer.getBounds(), { padding: [20,20], maxZoom: 15 });
+          map.fitBounds(trackLayer.getBounds(), { padding: [20,20] });
           await analyzeRoute(points);
-        }
-        // Otherwise, if addresses are provided, create fixed start/end markers
-        else if(start && end) {
+        } else if (start && end) {
           const startCoords = await geocodeLocation(start);
           const endCoords = await geocodeLocation(end);
-          const startMarker = L.marker(startCoords, { draggable: true }).addTo(map);
+          // Use custom icons for start and end markers
+          const startMarker = L.marker(startCoords, { draggable: true, icon: startIcon }).addTo(map);
           startMarker.options.isFixed = true;
           startMarker.on('dragend', () => recalcRoute());
           waypoints.push(startMarker);
-          const endMarker = L.marker(endCoords, { draggable: true }).addTo(map);
+          const endMarker = L.marker(endCoords, { draggable: true, icon: endIcon }).addTo(map);
           endMarker.options.isFixed = true;
           endMarker.on('dragend', () => recalcRoute());
           waypoints.push(endMarker);
           const bounds = L.latLngBounds([startCoords, endCoords]);
-          map.fitBounds(bounds, { padding: [20,20], maxZoom: 15 });
+          map.fitBounds(bounds, { padding: [20,20] });
           recalcRoute();
         } else {
-          throw new Error('Please provide either a GPX file or both addresses');
+          throw new Error('Please provide either a GPX file or both start and end addresses');
         }
-        // On mobile, hide the menu after route analysis.
+        // After processing, update recommended heading (if any)
+        displayRecommendedHeading();
         if (window.innerWidth <= 600) { hideMenu(); }
       } catch (error) {
         showError(error.message);
       }
     }
-
-    // GPX Parsing
+    
     async function parseGPX(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -445,8 +631,7 @@
         reader.readAsText(file);
       });
     }
-
-    // ========= WAYPOINTS & ROUTE CALCULATION =========
+    
     async function recalcRoute() {
       if (trackLayer) {
         map.removeLayer(trackLayer);
@@ -460,13 +645,15 @@
       try {
         const points = await calculateCyclingRoute(coordsArray);
         trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
-        map.fitBounds(trackLayer.getBounds(), { padding: [20,20], maxZoom: 15 });
+        map.fitBounds(trackLayer.getBounds(), { padding: [20,20] });
         await analyzeRoute(points);
-      } catch(e) {
+        // Update recommended heading based on start marker
+        displayRecommendedHeading();
+      } catch (e) {
         showError(e.message);
       }
     }
-
+    
     async function calculateCyclingRoute(coordsArray) {
       const params = new URLSearchParams({
         vehicle: 'bike',
@@ -487,17 +674,16 @@
       const data = await response.json();
       return data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
     }
-
+    
     async function geocodeLocation(query) {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`
       );
       const data = await response.json();
-      if(data.length === 0) throw new Error(`Location not found: ${query}`);
+      if (data.length === 0) throw new Error(`Location not found: ${query}`);
       return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
     }
-
-    // ========= ROUTE ANALYSIS / WEATHER MARKERS =========
+    
     async function analyzeRoute(points) {
       try {
         const startTime = new Date(document.getElementById('startTime').value);
@@ -505,7 +691,6 @@
         trackLayer._isBaseLayer = true;
         const totalDistance = trackLayer.getDistance();
         let errorCount = 0;
-        // Inject stats into the sidebar
         document.getElementById('stats').innerHTML = `
           <div>Total Distance: ${(totalDistance/1000).toFixed(1)} km</div>
           <div>Estimated Duration: ${(totalDistance/1000/avgSpeed).toFixed(1)} hours</div>
@@ -528,7 +713,7 @@
             const forecastResponse = await fetch(
               `https://api.openweathermap.org/data/2.5/forecast?lat=${point.lat}&lon=${point.lng}&units=metric&appid=${OPENWEATHER_KEY}`
             );
-            if(!forecastResponse.ok) {
+            if (!forecastResponse.ok) {
               const error = await forecastResponse.json();
               throw new Error(`Forecast API: ${error.message}`);
             }
@@ -547,7 +732,7 @@
               throw new Error('No forecast available for this time');
             }
             createWeatherMarkers(closestForecast, point, km, estTime);
-          } catch(error) {
+          } catch (error) {
             errorCount++;
             document.getElementById('errorMessage').innerHTML =
               `Failed to load forecast for ${errorCount} points. Check console for details.`;
@@ -559,16 +744,15 @@
           }
         }
         map.addLayer(windLayerGroup);
-        // On mobile, hide the menu after analysis.
         if (window.innerWidth <= 600) { hideMenu(); }
       } catch (error) {
         showError(error.message);
       }
     }
-
+    
     function createWeatherMarkers(forecast, point, km, estTime) {
       const tempC = forecast.main.temp;
-      const windSpeed = forecast.wind.speed * 3.6; // convert m/s to km/h
+      const windSpeed = forecast.wind.speed * 3.6;
       const windDeg = forecast.wind.deg;
       const weatherDesc = forecast.weather[0].description;
       const weatherMain = forecast.weather[0].main || '';
@@ -582,10 +766,9 @@
         <b>Wind Speed:</b> ${windSpeed.toFixed(1)} km/h<br>
         <b>Direction:</b> ${directionStr} (${windDeg}°)<br>
         <b>Forecast Time:</b> ${dateString}<br>
-        <b>Your ETA:</b> ${estTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}<br>
+        <b>Your ETA:</b> ${estTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}<br>
         <b>Precipitation (3h):</b> ${rain} mm
       `;
-      // Wind Marker: rotate only the arrow icon; text stays horizontal.
       const windIcon = L.divIcon({
         className: 'wind-marker',
         iconSize: [40, 40],
@@ -599,7 +782,7 @@
       const windMarker = L.marker(point, { icon: windIcon });
       windMarker.bindPopup(popupContent);
       windLayerGroup.addLayer(windMarker);
-      // Temperature Marker
+    
       const tempIcon = L.divIcon({
         className: '',
         iconSize: [40, 40],
@@ -610,7 +793,7 @@
       const tempMarker = L.marker(point, { icon: tempIcon });
       tempMarker.bindPopup(popupContent);
       tempLayerGroup.addLayer(tempMarker);
-      // Precipitation Marker
+    
       let precipHTML = '';
       if (rain > 0.1) {
         precipHTML = `<div style="color:blue;font-size:14px;"><i class="fas fa-cloud-showers-heavy"></i> ${rain}mm</div>`;
@@ -628,13 +811,12 @@
       precipMarker.bindPopup(popupContent);
       precipLayerGroup.addLayer(precipMarker);
     }
-
-    // ========= HELPER FUNCTIONS =========
+    
     function degreesToCompass(degrees) {
-      const directions = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
       return directions[Math.round((degrees % 360) / 22.5) % 16];
     }
-
+    
     function showError(message) {
       const errorDiv = document.createElement('div');
       errorDiv.className = 'error-message';
@@ -642,8 +824,10 @@
       document.getElementById('stats').appendChild(errorDiv);
       console.error(message);
     }
-
-    // ========= ADDING EXTRA WAYPOINTS =========
+    
+    /* -------------------------
+       Adding Extra Waypoints
+       ------------------------- */
     function addStopMarker(latlng) {
       const marker = L.marker(latlng, { draggable: true }).addTo(map);
       marker.options.isExtra = true;
@@ -661,8 +845,10 @@
       }
       recalcRoute();
     }
-
-    // ========= NEW: CLEAR MAP =========
+    
+    /* -------------------------
+       Clear Map Function
+       ------------------------- */
     function clearMap() {
       if (trackLayer) {
         map.removeLayer(trackLayer);
@@ -671,22 +857,144 @@
       windLayerGroup.clearLayers();
       tempLayerGroup.clearLayers();
       precipLayerGroup.clearLayers();
-      map.eachLayer(layer => {
+      const markers = [];
+      map.eachLayer(function(layer) {
         if (layer instanceof L.Marker && !layer._isBaseLayer) {
-          map.removeLayer(layer);
+          markers.push(layer);
         }
       });
+      markers.forEach(marker => map.removeLayer(marker));
       waypoints = [];
       document.getElementById('stats').innerHTML = '';
       document.getElementById('gpxFile').value = "";
       document.getElementById('fileName').textContent = "";
+      if (window.recommendedMarker) {
+        map.removeLayer(window.recommendedMarker);
+        window.recommendedMarker = null;
+      }
     }
-
-    // ========= WEATHER LAYER TOGGLE =========
+    
+    /* -------------------------
+       Random Route Generator (Best Candidate)
+       ------------------------- */
+    async function bestRandomRouteGenerator() {
+      // Get the starting location (user provided or current map center)
+      let locInput = document.getElementById('randomLocation').value.trim();
+      let center = locInput ? await geocodeLocation(locInput) : map.getCenter();
+    
+      const routeLength = parseInt(document.getElementById('routeLengthSlider').value);
+      const radius = routeLength / 3;
+      const startTime = new Date(document.getElementById('startTime').value);
+      const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
+    
+      // Array to store candidate routes
+      let candidates = [];
+    
+      // Generate 3 candidate routes
+      for (let i = 0; i < 5; i++) {
+        // Generate candidate points: [center, random point 1, random point 2, center]
+        let candidatePoints = [
+          center,
+          randomPointInCircle(center, radius),
+          randomPointInCircle(center, radius),
+          center
+        ];
+    
+        try {
+          // Calculate the route and tailwind score
+          let candidateRoute = await calculateCyclingRoute(candidatePoints);
+          let score = await computeTailwindScore(candidateRoute, startTime, avgSpeed);
+    
+          // If the tailwind score is negative, flip the intermediate points
+          if (score < 0) {
+            [candidatePoints[1], candidatePoints[2]] = [candidatePoints[2], candidatePoints[1]];
+            candidateRoute = await calculateCyclingRoute(candidatePoints);
+            score = await computeTailwindScore(candidateRoute, startTime, avgSpeed);
+          }
+    
+          candidates.push({
+            points: candidatePoints,
+            route: candidateRoute,
+            score: score
+          });
+        } catch (e) {
+          console.error("Candidate generation failed: ", e);
+        }
+      }
+    
+      if (candidates.length === 0) {
+        showError("Could not generate any candidate routes.");
+        return;
+      }
+    
+      // Sort candidates by tailwind score in descending order and select the best one
+      candidates.sort((a, b) => b.score - a.score);
+      const bestCandidate = candidates[0];
+    
+      // Remove any existing route from the map
+      if (trackLayer) {
+        map.removeLayer(trackLayer);
+      }
+      // Display the chosen route
+      trackLayer = L.polyline(bestCandidate.route, { className: 'route-line' }).addTo(map);
+      map.fitBounds(trackLayer.getBounds(), { padding: [20,20] });
+      await analyzeRoute(bestCandidate.route);
+    
+      // Clear existing waypoints and create new ones with custom icons for start and end
+      waypoints = [];
+      const startMarker = L.marker(center, { draggable: true, icon: startIcon }).addTo(map);
+      startMarker.options.isFixed = true;
+      startMarker.on('dragend', () => recalcRoute());
+      waypoints.push(startMarker);
+    
+      const wp1Marker = L.marker(bestCandidate.points[1], { draggable: true }).addTo(map);
+      wp1Marker.options.isExtra = true;
+      wp1Marker.on('dragend', () => recalcRoute());
+      waypoints.push(wp1Marker);
+    
+      const wp2Marker = L.marker(bestCandidate.points[2], { draggable: true }).addTo(map);
+      wp2Marker.options.isExtra = true;
+      wp2Marker.on('dragend', () => recalcRoute());
+      waypoints.push(wp2Marker);
+    
+      const endMarker = L.marker(center, { draggable: true, icon: endIcon }).addTo(map);
+      endMarker.options.isFixed = true;
+      endMarker.on('dragend', () => recalcRoute());
+      waypoints.push(endMarker);
+    
+      // Update the stats panel with the best candidate's tailwind score and orientation
+      document.getElementById('stats').innerHTML = `<div>Tailwind Score: ${bestCandidate.score.toFixed(1)}</div>`;
+      let orientation = getOrientation(bestCandidate.points.slice(0, 3));
+      document.getElementById('stats').innerHTML += `<div>Round Direction: ${orientation}</div>`;
+    
+      displayRecommendedHeading();
+      if (window.innerWidth <= 600) { hideMenu(); }
+    }
+    
+    /* -------------------------
+       Helper: Get Orientation (for round direction)
+       ------------------------- */
+    function getOrientation(points) {
+      if (points.length < 3) return "N/A";
+      const p0 = points[0], p1 = points[1], p2 = points[2];
+      // Compute the signed area of the triangle
+      const area = (p0.lng * p1.lat + p1.lng * p2.lat + p2.lng * p0.lat) -
+                   (p1.lng * p0.lat + p2.lng * p1.lat + p0.lng * p2.lat);
+      if (area > 0) return "counterclockwise";
+      else if (area < 0) return "clockwise";
+      else return "collinear";
+    }
+    
+    /* -------------------------
+       Toggle Weather Layer Function (Simplified)
+       ------------------------- */
     function toggleWeatherLayer() {
+      // Remove all weather layers first
       map.removeLayer(windLayerGroup);
       map.removeLayer(tempLayerGroup);
       map.removeLayer(precipLayerGroup);
+    
+      // Cycle through layers: wind -> temp -> precip -> wind
       if (currentWeatherLayer === 'wind') {
         currentWeatherLayer = 'temp';
         map.addLayer(tempLayerGroup);
@@ -699,7 +1007,7 @@
       }
       updateWeatherToggleIcon();
     }
-
+    
     function updateWeatherToggleIcon() {
       const iconEl = document.querySelector('#weatherToggle i');
       if (currentWeatherLayer === 'wind') {
@@ -710,29 +1018,95 @@
         iconEl.className = 'fas fa-cloud-showers-heavy';
       }
     }
-
-    // ========= MENU TOGGLE FUNCTIONS =========
-    function hideMenu() {
-      document.getElementById('controls').classList.add('hidden');
-      document.getElementById('menuToggle').innerText = "Show Menu";
-      if (window.innerWidth > 600) {
-        document.getElementById('map').style.left = "0";
-      }
+    
+    /* -------------------------
+       Helper Functions for Random Route
+       ------------------------- */
+    function randomPointInCircle(center, radius) {
+      const r = radius * Math.sqrt(Math.random());
+      const theta = 2 * Math.PI * Math.random();
+      const deltaLat = (r * Math.sin(theta)) / 111;
+      const deltaLng = (r * Math.cos(theta)) / (111 * Math.cos(center.lat * Math.PI / 180));
+      return L.latLng(center.lat + deltaLat, center.lng + deltaLng);
     }
-    function showMenu() {
-      document.getElementById('controls').classList.remove('hidden');
-      document.getElementById('menuToggle').innerText = "Hide Menu";
-      if (window.innerWidth > 600) {
-        document.getElementById('map').style.left = "300px";
+    
+    function computeTotalDistance(points) {
+      let total = 0;
+      for (let i = 1; i < points.length; i++) {
+         total += points[i-1].distanceTo(points[i]);
       }
+      return total;
     }
-    function toggleMenu() {
-      const controls = document.getElementById('controls');
-      if (controls.classList.contains('hidden')) {
-        showMenu();
-      } else {
-        hideMenu();
+    
+    function getPointAtDistanceFromRoute(points, target) {
+      let dist = 0;
+      for (let i = 1; i < points.length; i++) {
+         const segment = points[i-1].distanceTo(points[i]);
+         if (dist + segment >= target) {
+           const frac = (target - dist) / segment;
+           return L.latLng(
+             points[i-1].lat + frac * (points[i].lat - points[i-1].lat),
+             points[i-1].lng + frac * (points[i].lng - points[i-1].lng)
+           );
+         }
+         dist += segment;
       }
+      return points[points.length - 1];
+    }
+    
+    function computeBearing(start, end) {
+      const lat1 = start.lat * Math.PI / 180;
+      const lat2 = end.lat * Math.PI / 180;
+      const dLng = (end.lng - start.lng) * Math.PI / 180;
+      const y = Math.sin(dLng) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+      const brng = Math.atan2(y, x) * 180 / Math.PI;
+      return (brng + 360) % 360;
+    }
+    
+    async function computeTailwindScore(routePoints, startTime, avgSpeed) {
+      const totalDistance = computeTotalDistance(routePoints);
+      const sampleFractions = [0.25, 0.5, 0.75];
+      let totalTailwind = 0;
+      let count = 0;
+      for (let frac of sampleFractions) {
+        const targetDistance = totalDistance * frac;
+        const samplePoint = getPointAtDistanceFromRoute(routePoints, targetDistance);
+        let bearing;
+        const nextPoint = getPointAtDistanceFromRoute(routePoints, totalDistance * Math.min(frac + 0.1, 1));
+        if (nextPoint) {
+          bearing = computeBearing(samplePoint, nextPoint);
+        } else {
+          const prevPoint = getPointAtDistanceFromRoute(routePoints, totalDistance * Math.max(frac - 0.1, 0));
+          bearing = prevPoint ? computeBearing(prevPoint, samplePoint) : 0;
+        }
+        const travelTime = (targetDistance / 1000) / avgSpeed * 3600000;
+        const sampleTime = new Date(startTime.getTime() + travelTime);
+        try {
+          const forecastResponse = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${samplePoint.lat}&lon=${samplePoint.lng}&units=metric&appid=${OPENWEATHER_KEY}`);
+          if (!forecastResponse.ok) { continue; }
+          const forecastData = await forecastResponse.json();
+          const sampleTimestamp = Math.floor(sampleTime.getTime() / 1000);
+          let bestEntry = null, bestDiff = Infinity;
+          forecastData.list.forEach(entry => {
+            const diff = Math.abs(entry.dt - sampleTimestamp);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              bestEntry = entry;
+            }
+          });
+          if (!bestEntry) { continue; }
+          const windSpd = bestEntry.wind.speed * 3.6;
+          const windDir = bestEntry.wind.deg;
+          const angleDiff = (windDir - bearing) * Math.PI / 180;
+          const tailwind = windSpd * Math.cos(angleDiff);
+          totalTailwind += tailwind;
+          count++;
+        } catch (e) {
+          console.error("Error computing tailwind at sample:", e);
+        }
+      }
+      return count > 0 ? totalTailwind / count : 0;
     }
   </script>
 </body>
