@@ -532,11 +532,18 @@
     /* -------------------------
        Menu Toggle Functions
        ------------------------- */
-    function hideMenu() {
-      document.getElementById('controls').classList.add('hidden');
-      document.getElementById('menuToggle').innerText = "Show Menu";
-      if (window.innerWidth > 600) { document.getElementById('map').style.left = "0"; }
-    }
+function hideMenu() {
+  document.getElementById('controls').classList.add('hidden');
+  document.getElementById('menuToggle').innerText = "Show Menu";
+  if (window.innerWidth > 600) {
+    document.getElementById('map').style.left = "0";
+    // Wait for the CSS transition to complete before invalidating size
+    setTimeout(() => {
+      map.invalidateSize();
+      map.setView(map.getCenter());
+    }, 310); // 310ms ensures the 0.3s transition has finished
+  }
+}
     function showMenu() {
       document.getElementById('controls').classList.remove('hidden');
       document.getElementById('menuToggle').innerText = "Hide Menu";
