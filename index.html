@@ -756,6 +756,8 @@ function hideMenu() {
             `);
           }
         }
+        const tailwindScore = await computeTailwindScore(trackLayer.getLatLngs(), startTime, avgSpeed);
+document.getElementById('stats').innerHTML += `<div>Tailwind Score: ${tailwindScore.toFixed(1)}</div>`;
         map.addLayer(windLayerGroup);
         if (window.innerWidth <= 600) { hideMenu(); }
       } catch (error) {
