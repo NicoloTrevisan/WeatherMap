@@ -307,6 +307,12 @@
           <span id="fileName"></span>
         </div>
       </div>
+      <!-- GPX File Download -->
+      <div class="input-group">
+        <button onclick="saveRouteAsGPX()">
+          <i class="fas fa-save"></i> Save Route as GPX
+        </button>
+      </div>
       <!-- Clear Map Button -->
       <div class="section">
         <div class="input-group">
@@ -880,7 +886,37 @@ function hideMenu() {
         window.recommendedMarker = null;
       }
     }
-    
+        /* -------------------------
+       Save Map Function
+       ------------------------- */
+    function saveRouteAsGPX() {
+  if (!trackLayer) {
+    alert("No route available to save!");
+    return;
+  }
+  const latlngs = trackLayer.getLatLngs();
+  let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  gpx += '<gpx version="1.1" creator="Cycling Route Planner" xmlns="http://www.topografix.com/GPX/1/1">\n';
+  gpx += '  <trk>\n';
+  gpx += '    <name>Cycling Route</name>\n';
+  gpx += '    <trkseg>\n';
+  latlngs.forEach(pt => {
+    gpx += `      <trkpt lat="${pt.lat}" lon="${pt.lng}"></trkpt>\n`;
+  });
+  gpx += '    </trkseg>\n';
+  gpx += '  </trk>\n';
+  gpx += '</gpx>\n';
+
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'route.gpx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
     /* -------------------------
        Random Route Generator (Best Candidate)
        ------------------------- */
