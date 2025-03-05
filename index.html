@@ -922,147 +922,83 @@ document.getElementById('stats').innerHTML += `<div>Tailwind Score: ${tailwindSc
     /* -------------------------
        Random Route Generator (Best Candidate)
        ------------------------- */
-    async function bestRandomRouteGenerator() {
-      // Get the starting location (user provided or current map center)
-      let locInput = document.getElementById('randomLocation').value.trim();
-      let center = locInput ? await geocodeLocation(locInput) : map.getCenter();
-    
-      const routeLength = parseInt(document.getElementById('routeLengthSlider').value);
-      const radius = routeLength / 3;
-      const startTime = new Date(document.getElementById('startTime').value);
-      const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
-    
-      // Array to store candidate routes
-      let candidates = [];
-    
-      // Generate 3 candidate routes
-      for (let i = 0; i < 5; i++) {
-        // Generate candidate points: [center, random point 1, random point 2, center]
-        let candidatePoints = [
-          center,
-          randomPointInCircle(center, radius),
-          randomPointInCircle(center, radius),
-          center
-        ];
-    
-        try {
-          // Calculate the route and tailwind score
-          let candidateRoute = await calculateCyclingRoute(candidatePoints);
-          let score = await computeTailwindScore(candidateRoute, startTime, avgSpeed);
-    
-          // If the tailwind score is negative, flip the intermediate points
-          if (score < 0) {
-            [candidatePoints[1], candidatePoints[2]] = [candidatePoints[2], candidatePoints[1]];
-            candidateRoute = await calculateCyclingRoute(candidatePoints);
-            score = await computeTailwindScore(candidateRoute, startTime, avgSpeed);
-          }
-    
-          candidates.push({
-            points: candidatePoints,
-            route: candidateRoute,
-            score: score
-          });
-        } catch (e) {
-          console.error("Candidate generation failed: ", e);
-        }
+        async function bestRandomRouteGenerator() {
+  // 1) Get user inputs
+  let locInput = document.getElementById('randomLocation').value.trim();
+  let center = locInput ? await geocodeLocation(locInput) : map.getCenter();
+  
+  const routeLengthKm = parseInt(document.getElementById('routeLengthSlider').value);
+  const routeLengthMeters = routeLengthKm * 1000;
+  
+  const startTime = new Date(document.getElementById('startTime').value);
+  const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
+
+  // 2) Generate multiple candidate loops using different random seeds
+  let candidates = [];
+  for (let i = 0; i < 3; i++) {
+    // Round-trip “seed” to vary the generated loop
+    let seed = Math.floor(Math.random() * 100000);
+    // Build the GraphHopper Round Trip API URL
+    let url = `https://graphhopper.com/api/1/route?` +
+      `vehicle=bike&points_encoded=false&algorithm=round_trip` +
+      `&point=${center.lat},${center.lng}` +
+      `&round_trip.distance=${routeLengthMeters}` +
+      `&round_trip.seed=${seed}` +
+      `&key=${GRAPHHOPPER_KEY}`;
+    try {
+      let response = await fetch(url);
+      if (!response.ok) {
+        console.error("Round-trip request failed:", await response.text());
+        continue;
       }
-    
-      if (candidates.length === 0) {
-        showError("Could not generate any candidate routes.");
-        return;
-      }
-    
-      // Sort candidates by tailwind score in descending order and select the best one
-      candidates.sort((a, b) => b.score - a.score);
-      const bestCandidate = candidates[0];
-    
-      // Remove any existing route from the map
-      if (trackLayer) {
-        map.removeLayer(trackLayer);
-      }
-      // Display the chosen route
-      trackLayer = L.polyline(bestCandidate.route, { className: 'route-line' }).addTo(map);
-      map.fitBounds(trackLayer.getBounds(), { padding: [20,20] });
-      await analyzeRoute(bestCandidate.route);
-    
-      // Clear existing waypoints and create new ones with custom icons for start and end
-      waypoints = [];
-      const startMarker = L.marker(center, { draggable: true, icon: startIcon }).addTo(map);
-      startMarker.options.isFixed = true;
-      startMarker.on('dragend', () => recalcRoute());
-      waypoints.push(startMarker);
-    
-      const wp1Marker = L.marker(bestCandidate.points[1], { draggable: true }).addTo(map);
-      wp1Marker.options.isExtra = true;
-      wp1Marker.on('dragend', () => recalcRoute());
-      waypoints.push(wp1Marker);
-    
-      const wp2Marker = L.marker(bestCandidate.points[2], { draggable: true }).addTo(map);
-      wp2Marker.options.isExtra = true;
-      wp2Marker.on('dragend', () => recalcRoute());
-      waypoints.push(wp2Marker);
-    
-      const endMarker = L.marker(center, { draggable: true, icon: endIcon }).addTo(map);
-      endMarker.options.isFixed = true;
-      endMarker.on('dragend', () => recalcRoute());
-      waypoints.push(endMarker);
-    
-      // Update the stats panel with the best candidate's tailwind score and orientation
-      document.getElementById('stats').innerHTML = `<div>Tailwind Score: ${bestCandidate.score.toFixed(1)}</div>`;
-      let orientation = getOrientation(bestCandidate.points.slice(0, 3));
-      document.getElementById('stats').innerHTML += `<div>Round Direction: ${orientation}</div>`;
-    
-      displayRecommendedHeading();
-      if (window.innerWidth <= 600) { hideMenu(); }
+      let data = await response.json();
+      // Convert returned points to Leaflet latLng
+      let routePoints = data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
+      
+      // Compute tailwind score
+      let score = await computeTailwindScore(routePoints, startTime, avgSpeed);
+      candidates.push({ route: routePoints, score });
+    } catch (e) {
+      console.error("Round-trip generation failed:", e);
     }
-    
-    /* -------------------------
-       Helper: Get Orientation (for round direction)
-       ------------------------- */
-    function getOrientation(points) {
-      if (points.length < 3) return "N/A";
-      const p0 = points[0], p1 = points[1], p2 = points[2];
-      // Compute the signed area of the triangle
-      const area = (p0.lng * p1.lat + p1.lng * p2.lat + p2.lng * p0.lat) -
-                   (p1.lng * p0.lat + p2.lng * p1.lat + p0.lng * p2.lat);
-      if (area > 0) return "counterclockwise";
-      else if (area < 0) return "clockwise";
-      else return "collinear";
-    }
-    
-    /* -------------------------
-       Toggle Weather Layer Function (Simplified)
-       ------------------------- */
-    function toggleWeatherLayer() {
-      // Remove all weather layers first
-      map.removeLayer(windLayerGroup);
-      map.removeLayer(tempLayerGroup);
-      map.removeLayer(precipLayerGroup);
-    
-      // Cycle through layers: wind -> temp -> precip -> wind
-      if (currentWeatherLayer === 'wind') {
-        currentWeatherLayer = 'temp';
-        map.addLayer(tempLayerGroup);
-      } else if (currentWeatherLayer === 'temp') {
-        currentWeatherLayer = 'precip';
-        map.addLayer(precipLayerGroup);
-      } else {
-        currentWeatherLayer = 'wind';
-        map.addLayer(windLayerGroup);
-      }
-      updateWeatherToggleIcon();
-    }
-    
-    function updateWeatherToggleIcon() {
-      const iconEl = document.querySelector('#weatherToggle i');
-      if (currentWeatherLayer === 'wind') {
-        iconEl.className = 'fas fa-wind';
-      } else if (currentWeatherLayer === 'temp') {
-        iconEl.className = 'fas fa-thermometer-half';
-      } else {
-        iconEl.className = 'fas fa-cloud-showers-heavy';
-      }
-    }
+  }
+  
+  // 3) If no candidates, show error
+  if (candidates.length === 0) {
+    showError("Could not generate a round-trip route.");
+    return;
+  }
+  
+  // 4) Pick the loop with the best tailwind score
+  candidates.sort((a, b) => b.score - a.score);
+  const bestCandidate = candidates[0];
+
+  // 5) Display the route
+  if (trackLayer) {
+    map.removeLayer(trackLayer);
+  }
+  trackLayer = L.polyline(bestCandidate.route, { className: 'route-line' }).addTo(map);
+  map.fitBounds(trackLayer.getBounds(), { padding: [20, 20] });
+  
+  // Analyze (will show distance, duration, and tailwind score)
+  await analyzeRoute(bestCandidate.route);
+
+  // Clear old markers and place a single start/end marker
+  waypoints = [];
+  const startMarker = L.marker(center, { draggable: true, icon: startIcon }).addTo(map);
+  startMarker.options.isFixed = true;
+  startMarker.on('dragend', () => recalcRoute());
+  waypoints.push(startMarker);
+  
+  // Round-trip returns a loop, but we only have one official “start/end”
+  const endMarker = L.marker(center, { draggable: true, icon: endIcon }).addTo(map);
+  endMarker.options.isFixed = true;
+  endMarker.on('dragend', () => recalcRoute());
+  waypoints.push(endMarker);
+  
+  displayRecommendedHeading();
+  if (window.innerWidth <= 600) { hideMenu(); }
+}
     
     /* -------------------------
        Helper Functions for Random Route
