@@ -1079,7 +1079,8 @@ document.getElementById('stats').innerHTML += `<div>Tailwind Score: ${tailwindSc
           if (!bestEntry) { continue; }
           const windSpd = bestEntry.wind.speed * 3.6;
           const windDir = bestEntry.wind.deg;
-          const angleDiff = (windDir - bearing) * Math.PI / 180;
+          const effectiveWindDir = (windDir + 180) % 360;
+          const angleDiff = (effectiveWindDir - bearing) * Math.PI / 180;
           const tailwind = windSpd * Math.cos(angleDiff);
           totalTailwind += tailwind;
           count++;
