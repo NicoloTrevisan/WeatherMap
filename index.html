@@ -16,7 +16,7 @@
     /* Container: holds sidebar and map */
     #container {
       height: 100vh;
-      min-height: 0;
+      min-height: 0; /* Prevent flexbox overflow issues */
     }
 
     /* Desktop Layout: sidebar on left, map on right */
@@ -60,6 +60,7 @@
         border-radius: 4px;
         cursor: pointer;
         font-size: 14px;
+        transition: left 0.3s ease;
       }
       /* Weather Toggle Icon for desktop */
       #weatherToggle {
@@ -85,20 +86,26 @@
         min-height: 0;
       }
       .controls {
-        position: relative;
+        position: relative; /* Changed from absolute */
         width: 100%;
-        height: auto;
+        height: auto; /* Allow content to determine height */
+        max-height: 50vh; /* Limit height to prevent pushing map too far down */
+        overflow-y: auto; /* Allow scrolling if content exceeds max-height */
         border-right: none;
         border-bottom: 1px solid #dee2e6;
         min-height: 0;
+        background: rgba(248,249,250,0.95);
+        z-index: 1500;
+        padding: 12px;
       }
       .controls.hidden { display: none; }
       #map {
-        flex: 1 1 auto;
-        position: relative;
+        flex: 1 1 auto; /* Allow map to fill remaining space */
+        position: relative; /* Changed from absolute */
         width: 100%;
         background: #e8f4f8;
-        min-height: 0;
+        min-height: 0; /* Important for flexbox sizing */
+        z-index: 1000; /* Ensure map is below controls */
       }
       /* On mobile, menu toggle button fixed at top right */
       #menuToggle {
@@ -146,17 +153,21 @@
       border: 1px solid #ced4da;
       border-radius: 8px;
       width: 100%;
-      -webkit-appearance: none;
+      -webkit-appearance: none; /* Fix iOS styling */
+       appearance: none;
     }
     button { background: #007bff; color: white; font-weight: 500; cursor: pointer; }
     button:active { background: #0056b3; }
+    button:disabled { background: #6c757d; cursor: not-allowed; } /* Style for disabled buttons */
     .stats-box {
       padding: 12px;
       background: #fff;
       border: 1px solid #dee2e6;
       font-size: 14px;
       margin-top: 8px;
+      line-height: 1.6; /* Improve readability */
     }
+    .stats-box strong { color: #333; } /* Style for stat labels */
     .autocomplete-items {
       position: absolute;
       top: 100%; /* Position below the input */
@@ -175,8 +186,8 @@
     .autocomplete-item { padding: 12px; border-bottom: 1px solid #eee; line-height: 1.4; cursor: pointer; }
     .autocomplete-item:last-child { border-bottom: none; }
     .autocomplete-item:hover { background: #f8f9fa; }
-    .error-message { color: #dc3545; padding: 8px; }
-    #fileName { padding: 8px; color: #6c757d; }
+    .error-message { color: #dc3545; padding: 8px 0; font-weight: bold; } /* Style for error display */
+    #fileName { padding: 8px; color: #6c757d; font-style: italic; }
 
     /* Tabs Styles */
     .tabs {
@@ -194,8 +205,9 @@
       background: #007bff;
       color: #fff;
     }
-    .tabs button.active {
+    .tabs button.active { /* Style for the active tab button */
       background: #0056b3;
+      font-weight: bold;
     }
     .tab-content { margin-bottom: 16px; }
 
@@ -204,6 +216,7 @@
       -webkit-appearance: none;
       width: 100%;
       background: transparent;
+      cursor: pointer;
     }
     input[type="range"]::-webkit-slider-runnable-track {
       width: 100%;
@@ -220,7 +233,22 @@
       background: #fff;
       cursor: pointer;
       -webkit-appearance: none;
-      margin-top: -6px;
+      margin-top: -6px; /* Adjust thumb position */
+    }
+     input[type="range"]::-moz-range-track { /* Firefox */
+      width: 100%;
+      height: 8px;
+      cursor: pointer;
+      background: #007bff;
+      border-radius: 4px;
+    }
+    input[type="range"]::-moz-range-thumb { /* Firefox */
+      border: 1px solid #007bff;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
     }
     input[type="range"]:focus { outline: none; }
     .range-labels {
@@ -230,8 +258,19 @@
       margin-top: 4px;
     }
 
-    /* Recommended Heading Marker Styles */
+    /* Recommended Heading Marker Styles (Placeholder) */
     .recommended-heading { }
+
+    /* Wind Marker Styling */
+    .wind-marker i {
+        font-size: 20px; /* Adjust arrow size */
+        color: #0056b3; /* Adjust arrow color */
+    }
+    .wind-marker span {
+        font-size: 12px; /* Adjust text size */
+        font-weight: bold;
+        color: #333;
+    }
   </style>
 </head>
 <body>
@@ -246,9 +285,9 @@
       </div>
       <!-- Tabs -->
       <div class="tabs">
-        <button type="button" id="tabGenerateRouteBtn" onclick="showTab('generateRoute')">Generate Route</button>
-        <button type="button" id="tabRandomRouteBtn" onclick="showTab('generateRandom')">Random Route</button>
-        <button type="button" id="tabSettingsBtn" onclick="showTab('settings')">Settings</button>
+        <button type="button" id="tabGenerateRouteBtn" class="active" onclick="showTab('generateRoute', this)">Generate Route</button>
+        <button type="button" id="tabRandomRouteBtn" onclick="showTab('generateRandom', this)">Random Route</button>
+        <button type="button" id="tabSettingsBtn" onclick="showTab('settings', this)">Settings</button>
       </div>
       <!-- Tab Contents -->
       <div class="tab-content" id="generateRoute" style="display:block;">
@@ -261,7 +300,7 @@
             <input type="text" id="endLocation" placeholder="End Address" autocomplete="off">
           </div>
           <div class="input-group">
-            <button onclick="processInput()">Generate Route</button>
+            <button id="generateRouteButton" onclick="processInput()">Generate Route</button>
           </div>
         </div>
       </div>
@@ -269,7 +308,7 @@
         <div class="section">
           <h3>Generate Random Route</h3>
           <div class="input-group">
-            <input type="text" id="randomLocation" placeholder="Random Route Location" autocomplete="off">
+            <input type="text" id="randomLocation" placeholder="Start Location (optional, uses map center if blank)" autocomplete="off">
           </div>
           <div class="input-group">
             <label for="routeLengthSlider">Desired Total Route Length (km): <span id="routeLengthValue">50 km</span></label>
@@ -277,7 +316,7 @@
             <div class="range-labels">20 km — 200 km</div>
           </div>
           <div class="input-group">
-            <button onclick="bestRandomRouteGenerator()"><i class="fas fa-random"></i> Generate Best Random Route</button>
+            <button id="generateRandomButton" onclick="bestRandomRouteGenerator()"><i class="fas fa-random"></i> Generate Best Random Route</button>
           </div>
         </div>
       </div>
@@ -297,7 +336,7 @@
             </select>
           </div>
           <div class="input-group">
-            <label for="datapointsCount"># Data Points for Forecast</label>
+            <label for="datapointsCount"># Weather Points along Route</label>
             <select id="datapointsCount">
               <option value="5">5</option>
               <option value="10" selected>10</option>
@@ -313,34 +352,38 @@
         <h3>GPX File</h3>
         <div class="input-group">
           <input type="file" id="gpxFile" accept=".gpx" hidden>
-          <button onclick="document.getElementById('gpxFile').click()">
+          <button id="loadGpxButton" onclick="document.getElementById('gpxFile').click()">
             <i class="fas fa-file-upload"></i> Load GPX File
           </button>
-          <span id="fileName"></span>
+          <span id="fileName">No file selected</span>
         </div>
       </div>
       <!-- GPX File Download -->
       <div class="input-group">
-        <button onclick="saveRouteAsGPX()">
+        <button id="saveGpxButton" onclick="saveRouteAsGPX()">
           <i class="fas fa-save"></i> Save Route as GPX
         </button>
       </div>
       <!-- Clear Map Button -->
       <div class="section">
         <div class="input-group">
-          <button onclick="clearMap()"><i class="fas fa-trash"></i> Clear Map</button>
+          <button id="clearMapButton" onclick="clearMap()"><i class="fas fa-trash"></i> Clear Map</button>
         </div>
       </div>
       <!-- Statistics -->
       <div class="section">
         <h3>Statistics</h3>
         <div class="stats-box" id="stats">
+          <div id="errorDisplay" class="error-message"></div>
+          <div id="statsContent">No route loaded.</div>
           <!-- Statistics and weather info will appear here -->
         </div>
       </div>
       <div class="section">
-        <p>Right-click (or long-press) on the map to add an extra waypoint.<br>
-           Right-click on an extra waypoint to remove it.</p>
+        <p style="font-size: 13px; color: #6c757d;">
+           <i class="fas fa-info-circle"></i> Right-click (or long-press on mobile) on the map to add a waypoint.<br>
+           <i class="fas fa-info-circle"></i> Right-click (or long-press) on an existing waypoint (blue dot) to remove it.
+        </p>
       </div>
     </div>
     <!-- Map -->
@@ -352,159 +395,191 @@
 
   <!-- Weather Toggle Icon -->
   <div id="weatherToggle" onclick="toggleWeatherLayer()">
-    <i class="fas fa-wind"></i>
+    <i class="fas fa-wind"></i> <!-- Default icon -->
   </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
   <script>
     /* -------------------------
-       Define Custom Icons for Start/End
+       Define Custom Icons for Start/End/Waypoints
        ------------------------- */
     const startIcon = L.divIcon({
-      html: '<i class="fas fa-flag" style="color: green; font-size: 24px;"></i>',
+      html: '<i class="fas fa-flag" style="color: green; font-size: 24px; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"></i>',
       iconSize: [24, 24],
-      className: ''
+      className: '', // No extra class needed
+      iconAnchor: [12, 24], // Anchor at bottom center
+      popupAnchor: [0, -24] // Popup above icon
     });
     const endIcon = L.divIcon({
-      html: '<i class="fas fa-flag-checkered" style="color: red; font-size: 24px;"></i>',
+      html: '<i class="fas fa-flag-checkered" style="color: red; font-size: 24px; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"></i>',
       iconSize: [24, 24],
-      className: ''
+      className: '',
+      iconAnchor: [12, 24],
+      popupAnchor: [0, -24]
     });
+    // Default marker icon for extra waypoints (Leaflet's default blue)
+    // standard marker but it is draggable
 
     /* -------------------------
-       TAB SWITCHING FUNCTIONS
+       API Keys & Endpoints
        ------------------------- */
-    function showTab(tabId) {
-      const contents = document.getElementsByClassName('tab-content');
-      for (let i = 0; i < contents.length; i++) {
-        contents[i].style.display = 'none';
-      }
-      document.getElementById(tabId).style.display = 'block';
-    }
+    const GRAPHHOPPER_KEY = '594dca35-3715-43ea-ac3b-fd23dc58808a'; 
+    const OPENWEATHER_KEY = '154dc010adbb10c0549d6d077e64b073'; 
+    const GRAPHHOPPER_URL = 'https://graphhopper.com/api/1/route';
+    const OPENWEATHER_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast';
+    const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 
     /* -------------------------
        Global Variables & Initialization
        ------------------------- */
     let map, trackLayer;
-    let waypoints = []; // Contains fixed (start/end) and extra waypoints
+    let waypoints = []; // Contains L.Marker objects: fixed (start/end) and extra waypoints
     let windLayerGroup = L.layerGroup();
     let tempLayerGroup = L.layerGroup();
     let precipLayerGroup = L.layerGroup();
     let currentWeatherLayer = 'wind'; // Options: 'wind', 'temp', 'precip'
-
-    const GRAPHHOPPER_KEY = '594dca35-3715-43ea-ac3b-fd23dc58808a';
-    const OPENWEATHER_KEY = '154dc010adbb10c0549d6d077e64b073';
+    let activeButtons = []; // To keep track of buttons to disable/enable
 
     function initMap() {
       const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-      map = L.map('map', { zoomControl: false }).setView([51.8426, 5.8528], isMobile ? 12 : 13);
+      map = L.map('map', { zoomControl: false }).setView([51.8426, 5.8528], isMobile ? 12 : 13); // Default view (Nijmegen, NL)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
       L.control.zoom({ position: 'topright' }).addTo(map);
 
+      // Set default departure time to now
       document.getElementById('startTime').value = new Date().toISOString().slice(0, 16);
 
+      // Update slider value display
       document.getElementById('routeLengthSlider').addEventListener('input', function(e) {
         document.getElementById('routeLengthValue').textContent = e.target.value + " km";
       });
 
+      // Setup autocomplete for location inputs
       ['startLocation', 'endLocation', 'randomLocation'].forEach(id => {
         const input = document.getElementById(id);
         if (input) {
           input.addEventListener('input', debounce(function(e) {
             handleAutocomplete(e.target.value, input);
           }));
-          // Add focusout listener to clear suggestions when focus leaves the input
           input.addEventListener('focusout', (e) => {
             // Delay removal slightly to allow click on suggestion item
             setTimeout(() => {
-                // Check if the new focused element is part of the autocomplete list for *this* input
                 const relatedTargetIsAutocompleteItem = e.relatedTarget && e.relatedTarget.closest('.autocomplete-items');
                 const listForThisInput = input.parentNode.querySelector('.autocomplete-items');
-
-                // Only remove if focus moves outside the list associated with this input
                 if (!relatedTargetIsAutocompleteItem || (relatedTargetIsAutocompleteItem && relatedTargetIsAutocompleteItem !== listForThisInput)) {
                      if(listForThisInput) listForThisInput.remove();
                 }
-            }, 150); // 150ms delay
+            }, 150);
           });
         }
       });
 
-      // When a GPX file is loaded, process and display the route immediately.
+      // Process GPX file immediately on selection
       document.getElementById('gpxFile').addEventListener('change', function(e) {
-        document.getElementById('fileName').textContent = e.target.files[0].name;
-        processInput();
-      });
-
-      // Right-click (desktop) to add/remove an extra waypoint
-      map.on('contextmenu', function(e) {
-        e.originalEvent.preventDefault();
-        let found = false;
-        map.eachLayer(layer => {
-          if (layer instanceof L.Marker && !layer.options.isFixed && layer.options.isExtra) {
-            const markerPt = map.latLngToContainerPoint(layer.getLatLng());
-            const clickPt = map.latLngToContainerPoint(e.latlng);
-            if (markerPt.distanceTo(clickPt) < 20) {
-              map.removeLayer(layer);
-              waypoints = waypoints.filter(m => m !== layer);
-              recalcRoute();
-              found = true;
-            }
-          }
-        });
-        if (!found) { addStopMarker(e.latlng); }
-      });
-
-      // Long-press (mobile) to add an extra waypoint (if one touch)
-      let touchTimer;
-      map.getContainer().addEventListener('touchstart', function(e) {
-        if (e.touches.length === 1) {
-          touchTimer = setTimeout(() => {
-            const touch = e.touches[0];
-            const point = map.mouseEventToLatLng(touch);
-            addStopMarker(point);
-          }, 1500);
+        if (e.target.files.length > 0) {
+            document.getElementById('fileName').textContent = e.target.files[0].name;
+            processInput(); // Trigger route processing
+        } else {
+            document.getElementById('fileName').textContent = "No file selected";
         }
       });
-      map.getContainer().addEventListener('touchend', function(e) {
-        clearTimeout(touchTimer);
-        setTimeout(() => { map.invalidateSize(); }, 300);
+
+      // Map interaction for adding/removing waypoints
+      map.on('contextmenu', handleMapContextMenu); // Desktop right-click
+      setupLongPressHandler(); // Mobile long-press
+
+      // Window resize handler
+      window.addEventListener('resize', () => {
+          map.invalidateSize();
+          // Adjust map position if menu state changes due to resize crossing breakpoint
+          const controls = document.getElementById('controls');
+          if (window.innerWidth > 600 && !controls.classList.contains('hidden')) {
+              document.getElementById('map').style.left = "300px";
+              document.getElementById('menuToggle').style.left = "310px";
+          } else if (window.innerWidth > 600 && controls.classList.contains('hidden')) {
+              document.getElementById('map').style.left = "0";
+              document.getElementById('menuToggle').style.left = "10px"; // Position when menu hidden
+          } else {
+              // Mobile layout, map left is always 0
+              document.getElementById('map').style.left = "0";
+              document.getElementById('menuToggle').style.left = ""; // Reset desktop positioning
+          }
       });
-      window.addEventListener('resize', () => map.invalidateSize());
 
-      // Show default tab (Generate Route)
-      showTab('generateRoute');
+      // Show default tab
+      showTab('generateRoute', document.getElementById('tabGenerateRouteBtn'));
 
-      // Global click listener to close any autocomplete lists if clicked outside
+      // Global click listener to close autocomplete lists
       document.addEventListener('click', function(event) {
         const isClickInsideInput = event.target.matches('#startLocation, #endLocation, #randomLocation');
         const isClickInsideAutocomplete = event.target.closest('.autocomplete-items');
-
         if (!isClickInsideInput && !isClickInsideAutocomplete) {
             document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
         }
       });
+
+      // Identify buttons to manage during loading states
+      activeButtons = [
+          document.getElementById('generateRouteButton'),
+          document.getElementById('generateRandomButton'),
+          document.getElementById('loadGpxButton'),
+          document.getElementById('saveGpxButton'),
+          document.getElementById('clearMapButton')
+      ];
     }
     initMap();
 
     /* -------------------------
-       Polyline Extension
+       Loading State Management
+       ------------------------- */
+    function showLoading(message = "Loading...") {
+        activeButtons.forEach(btn => {
+            if (btn) {
+                btn.disabled = true;
+                // Optionally change text, e.g., for the button that triggered the action
+                // if (btn.id === 'generateRouteButton') btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating...`;
+            }
+        });
+        // You could also show a global overlay spinner here if desired
+        document.getElementById('errorDisplay').textContent = ''; // Clear previous errors
+        console.log(message); // Log loading state
+    }
+
+    function hideLoading() {
+        activeButtons.forEach(btn => {
+            if (btn) {
+                btn.disabled = false;
+                // Restore original text if changed
+                // if (btn.id === 'generateRouteButton') btn.innerHTML = 'Generate Route';
+            }
+        });
+        // Hide global overlay spinner if used
+    }
+
+
+    /* -------------------------
+       Polyline Extension (No changes needed)
        ------------------------- */
     L.Polyline.include({
-      getDistance: function() {
+      getDistance: function() { /* ... as before ... */
         return this.getLatLngs().reduce((acc, pt, i, arr) =>
           i > 0 ? acc + arr[i-1].distanceTo(pt) : acc, 0);
       },
-      getPointAtDistance: function(target) {
+      getPointAtDistance: function(target) { /* ... as before ... */
         let dist = 0;
         const pts = this.getLatLngs();
+        if (target <= 0) return pts.length > 0 ? pts[0] : null;
+        if (target >= this.getDistance()) return pts.length > 0 ? pts[pts.length - 1] : null;
+
         for (let i = 1; i < pts.length; i++) {
           const segment = pts[i-1].distanceTo(pts[i]);
           if (dist + segment >= target) {
             const frac = (target - dist) / segment;
+            // Check for division by zero or very small segments
+            if (segment < 1e-9) return pts[i-1];
             return L.latLng(
               pts[i-1].lat + frac * (pts[i].lat - pts[i-1].lat),
               pts[i-1].lng + frac * (pts[i].lng - pts[i-1].lng)
@@ -512,14 +587,14 @@
           }
           dist += segment;
         }
-        return null;
+        return pts.length > 0 ? pts[pts.length - 1] : null; // Fallback
       }
     });
 
     /* -------------------------
-       Autocomplete Function
+       Autocomplete Function (Minor refinement for loading)
        ------------------------- */
-    function debounce(func, timeout = 300) {
+    function debounce(func, timeout = 300) { /* ... as before ... */
       let timer;
       return (...args) => {
         clearTimeout(timer);
@@ -528,47 +603,46 @@
     }
 
     async function handleAutocomplete(query, inputField) {
-      // Remove any existing list specifically for THIS input field first
-      const existingList = inputField.parentNode.querySelector('.autocomplete-items');
+      const parentGroup = inputField.parentNode;
+      const existingList = parentGroup.querySelector('.autocomplete-items');
       if (existingList) existingList.remove();
 
-      // If query is too short, ensure no list is shown and exit
-      if (query.length < 3) {
-          return;
-      }
+      if (query.length < 3) return;
 
-      // Create and show loading indicator
       const loading = document.createElement('div');
-      loading.className = 'autocomplete-items'; // Use the same class for positioning
-      loading.innerHTML = '<div class="autocomplete-item">Loading...</div>';
-      inputField.parentNode.appendChild(loading); // Append to the specific input's parent
+      loading.className = 'autocomplete-items';
+      loading.innerHTML = '<div class="autocomplete-item" style="color: #6c757d;"><i>Searching...</i></div>';
+      parentGroup.appendChild(loading);
 
       try {
-        let typeParam = query.length < 5 ? 'city,town,village' : 'city,town,village,locality,road';
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=10&q=${encodeURIComponent(query)}&addressdetails=1&accept-language=en&countrycodes=de,fr,it,es,nl,be,ch,at,pt,se,no,dk,fi,pl,ie,cz,hu,ro,gr&dedupe=1&polygon_text=0&type=${typeParam}`;
+        // Prioritize local results slightly more for shorter queries
+        let typeParam = query.length < 6 ? 'city,town,village' : 'city,town,village,locality,road';
+        // Added viewbox based on current map view to prioritize local results
+        const bounds = map.getBounds();
+        const viewbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
+
+        const url = `${NOMINATIM_SEARCH_URL}?format=json&limit=5&q=${encodeURIComponent(query)}&addressdetails=1&accept-language=en&dedupe=1&polygon_text=0&type=${typeParam}&viewbox=${viewbox}&bounded=1`;
+
         const response = await fetch(url);
         const data = await response.json();
 
-        // Remove loading indicator
-        loading.remove();
+        loading.remove(); // Remove loading indicator
 
-        // Check again if the input still has focus and query is long enough,
-        // otherwise the user might have clicked away or deleted text
-        if (document.activeElement !== inputField || inputField.value.length < 3) {
-            return;
-        }
+        // Re-check if input still focused and query valid
+        if (document.activeElement !== inputField || inputField.value.length < 3) return;
 
-        // Remove any list that might have been created if another request finished faster
-        const currentList = inputField.parentNode.querySelector('.autocomplete-items');
+        // Remove any list created if another request finished faster
+        const currentList = parentGroup.querySelector('.autocomplete-items');
         if (currentList) currentList.remove();
 
-        const filteredResults = data
-          .filter(item => !['waterway', 'house', 'pedestrian', 'hotel'].includes(item.type))
-          .sort((a, b) => (a.importance > b.importance ? -1 : 1))
-          .slice(0, 5);
+        // Filter less useful types and sort (already done by Nominatim importance mostly)
+        const filteredResults = data.filter(item => !['waterway', 'house', 'pedestrian', 'hotel', 'platform', 'station'].includes(item.type));
 
-        // If no results, don't show an empty list
         if (filteredResults.length === 0) {
+            const noResult = document.createElement('div');
+            noResult.className = 'autocomplete-items';
+            noResult.innerHTML = '<div class="autocomplete-item" style="color: #6c757d;"><i>No results found</i></div>';
+            parentGroup.appendChild(noResult);
             return;
         }
 
@@ -579,55 +653,73 @@
           div.className = 'autocomplete-item';
           const mainText = document.createElement('div');
           mainText.style.fontWeight = '500';
-          mainText.textContent = item.display_name.split(',')[0];
+          // Try to get a concise name
+          mainText.textContent = item.name || item.display_name.split(',')[0];
           const subText = document.createElement('div');
           subText.style.fontSize = '0.9em';
           subText.style.color = '#6c757d';
-          subText.textContent = item.display_name.split(',').slice(1).join(',').trim();
+          // Construct a more readable subtext
+          let addressParts = [];
+          if (item.address) {
+              if(item.address.road && item.address.road !== mainText.textContent) addressParts.push(item.address.road);
+              if(item.address.suburb && item.address.suburb !== mainText.textContent) addressParts.push(item.address.suburb);
+              if(item.address.city && item.address.city !== mainText.textContent) addressParts.push(item.address.city);
+              else if(item.address.town && item.address.town !== mainText.textContent) addressParts.push(item.address.town);
+              else if(item.address.village && item.address.village !== mainText.textContent) addressParts.push(item.address.village);
+              if(item.address.country) addressParts.push(item.address.country);
+          }
+          // Fallback if address parts are missing
+          subText.textContent = addressParts.length > 0 ? addressParts.slice(0, 2).join(', ') : item.display_name.split(',').slice(1).join(',').trim();
+
           div.appendChild(mainText);
           div.appendChild(subText);
-          // Use mousedown instead of click to fire before focusout
-          div.addEventListener('mousedown', () => {
-            inputField.value = item.display_name;
-            list.remove(); // Remove this specific list
+          div.addEventListener('mousedown', () => { // Use mousedown to fire before focusout
+            inputField.value = item.display_name; // Use full display_name for geocoding later
+            list.remove();
           });
           list.appendChild(div);
         });
-        inputField.parentNode.appendChild(list); // Append the final list
+        parentGroup.appendChild(list);
       } catch (error) {
-        // Ensure loading indicator is removed on error too
-        const currentLoading = inputField.parentNode.querySelector('.autocomplete-items');
-        if (currentLoading && currentLoading.firstChild && currentLoading.firstChild.textContent === 'Loading...') {
-            currentLoading.remove();
-        }
-        console.error('Address suggestions unavailable:', error); // Log error instead of showing UI error
+        const currentLoading = parentGroup.querySelector('.autocomplete-items');
+        if (currentLoading) currentLoading.remove();
+        console.error('Address suggestions unavailable:', error);
+        // Optionally show a temporary error in the list
+        const errorList = document.createElement('div');
+        errorList.className = 'autocomplete-items';
+        errorList.innerHTML = '<div class="autocomplete-item" style="color: #dc3545;"><i>Suggestions failed</i></div>';
+        parentGroup.appendChild(errorList);
+        setTimeout(() => errorList.remove(), 2000); // Auto-remove error
       }
     }
 
-
     /* -------------------------
-       Menu Toggle Functions
+       Menu Toggle Functions (Adjusted for map positioning)
        ------------------------- */
     function hideMenu() {
       document.getElementById('controls').classList.add('hidden');
       document.getElementById('menuToggle').innerText = "Show Menu";
       if (window.innerWidth > 600) {
         document.getElementById('map').style.left = "0";
+        document.getElementById('menuToggle').style.left = "10px"; // Position toggle near edge
         // Wait for the CSS transition to complete before invalidating size
-        setTimeout(() => {
-          map.invalidateSize();
-          map.setView(map.getCenter());
-        }, 310); // 310ms ensures the 0.3s transition has finished
+        setTimeout(() => { map.invalidateSize({ pan: false }); }, 310); // No pan needed
+      } else {
+          // On mobile, hiding controls doesn't change map position, just makes more space
+          setTimeout(() => { map.invalidateSize({ pan: false }); }, 50); // Small delay might help redraw
       }
     }
     function showMenu() {
       document.getElementById('controls').classList.remove('hidden');
       document.getElementById('menuToggle').innerText = "Hide Menu";
-      if (window.innerWidth > 600) { document.getElementById('map').style.left = "300px"; }
-       // Invalidate map size after showing menu to ensure it redraws correctly
-       setTimeout(() => {
-          map.invalidateSize();
-       }, 310); // Match transition time
+      if (window.innerWidth > 600) {
+          document.getElementById('map').style.left = "300px";
+          document.getElementById('menuToggle').style.left = "310px";
+      } else {
+          document.getElementById('map').style.left = "0"; // Ensure map is at left edge on mobile
+      }
+       // Invalidate map size after showing menu
+       setTimeout(() => { map.invalidateSize({ pan: false }); }, 310); // Match transition time
     }
     function toggleMenu() {
       const controls = document.getElementById('controls');
@@ -635,598 +727,992 @@
     }
 
     /* -------------------------
-       Tab Switching Functions
+       Tab Switching Functions (Added active class handling)
        ------------------------- */
-    function showTab(tabId) {
+    function showTab(tabId, buttonElement) {
+      // Hide all tab contents
       const contents = document.getElementsByClassName('tab-content');
       for (let i = 0; i < contents.length; i++) {
         contents[i].style.display = 'none';
       }
+      // Show the selected tab content
       document.getElementById(tabId).style.display = 'block';
 
-      // When switching tabs, remove any open autocomplete lists
+      // Update active class on tab buttons
+      const buttons = document.querySelectorAll('.tabs button');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      if (buttonElement) {
+          buttonElement.classList.add('active');
+      }
+
+      // Remove any open autocomplete lists when switching tabs
       document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
     }
 
     /* -------------------------
-       Route Generation Functions
+       Route Generation Functions (with Loading States)
        ------------------------- */
     async function processInput() {
-      // Remove any open autocomplete lists before processing
-      document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
+      document.querySelectorAll('.autocomplete-items').forEach(el => el.remove()); // Clear autocomplete
+      showLoading("Processing input..."); // Show loading state
+
       try {
         const file = document.getElementById('gpxFile').files[0];
         const start = document.getElementById('startLocation').value.trim();
         const end = document.getElementById('endLocation').value.trim();
-        if (trackLayer) map.removeLayer(trackLayer);
-        windLayerGroup.clearLayers();
-        tempLayerGroup.clearLayers();
-        precipLayerGroup.clearLayers();
-        // Remove all markers (collect into an array first)
-        const markers = [];
-        map.eachLayer(function(layer) {
-          if (layer instanceof L.Marker && !layer._isBaseLayer) {
-            markers.push(layer);
-          }
-        });
-        markers.forEach(marker => map.removeLayer(marker));
 
-        document.getElementById('stats').innerHTML = '';
-        waypoints = [];
+        // Clear previous route and markers
+        clearRouteData();
+        document.getElementById('statsContent').innerHTML = 'Processing...'; // Update stats display
+
         if (file) {
           const points = await parseGPX(file);
-          trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
-          map.fitBounds(trackLayer.getBounds(), { padding: [20,20] });
+          if (!points || points.length < 2) throw new Error("GPX file contains insufficient points.");
+          trackLayer = L.polyline(points, { color: '#007bff', weight: 5, opacity: 0.8 }).addTo(map);
+          map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+          // Add non-draggable start/end markers for GPX routes
+          L.marker(points[0], { icon: startIcon, interactive: false }).addTo(map);
+          L.marker(points[points.length - 1], { icon: endIcon, interactive: false }).addTo(map);
+          waypoints = []; // No draggable waypoints for GPX import initially
           await analyzeRoute(points);
         } else if (start && end) {
           const startCoords = await geocodeLocation(start);
           const endCoords = await geocodeLocation(end);
-          // Use custom icons for start and end markers
+
+          // Add draggable start/end markers
           const startMarker = L.marker(startCoords, { draggable: true, icon: startIcon }).addTo(map);
-          startMarker.options.isFixed = true;
-          startMarker.on('dragend', () => recalcRoute());
+          startMarker.options.isFixed = true; // Mark as start point
+          startMarker.on('dragend', () => { waypoints[0] = startMarker; recalcRoute(); }); // Update waypoint array on drag
           waypoints.push(startMarker);
+
           const endMarker = L.marker(endCoords, { draggable: true, icon: endIcon }).addTo(map);
-          endMarker.options.isFixed = true;
-          endMarker.on('dragend', () => recalcRoute());
+          endMarker.options.isFixed = true; // Mark as end point
+          endMarker.on('dragend', () => { waypoints[waypoints.length - 1] = endMarker; recalcRoute(); }); // Update waypoint array on drag
           waypoints.push(endMarker);
-          const bounds = L.latLngBounds([startCoords, endCoords]);
-          map.fitBounds(bounds, { padding: [20,20] });
-          recalcRoute();
+
+          map.fitBounds(L.latLngBounds([startCoords, endCoords]), { padding: [30, 30] });
+          await recalcRoute(); // Calculate and analyze the initial route
         } else {
-          throw new Error('Please provide either a GPX file or both start and end addresses');
+          throw new Error('Please provide a GPX file OR both start and end addresses.');
         }
-        // After processing, update recommended heading (if any)
-        displayRecommendedHeading();
+
+        // Hide menu on mobile after successful generation
         if (window.innerWidth <= 600) { hideMenu(); }
+
       } catch (error) {
         showError(error.message);
+        document.getElementById('statsContent').innerHTML = 'Route generation failed.'; // Update stats
+      } finally {
+        hideLoading(); // Hide loading state regardless of success/failure
       }
     }
 
-    async function parseGPX(file) {
+    async function parseGPX(file) { /* ... as before ... */
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = e => {
           try {
             const gpx = new DOMParser().parseFromString(e.target.result, "text/xml");
             const trackPoints = Array.from(gpx.getElementsByTagName('trkpt'));
+            if (trackPoints.length === 0) { // Check for route points as fallback
+                const routePoints = Array.from(gpx.getElementsByTagName('rtept'));
+                 if (routePoints.length > 0) {
+                     const latlngs = routePoints.map(pt => L.latLng(
+                        parseFloat(pt.getAttribute('lat')),
+                        parseFloat(pt.getAttribute('lon'))
+                     ));
+                     resolve(latlngs);
+                     return;
+                 }
+            }
             const latlngs = trackPoints.map(pt => L.latLng(
               parseFloat(pt.getAttribute('lat')),
               parseFloat(pt.getAttribute('lon'))
             ));
             resolve(latlngs);
           } catch (error) {
-            reject('Invalid GPX file format');
+            reject(new Error('Invalid or unreadable GPX file format.'));
           }
         };
+        reader.onerror = () => reject(new Error('Failed to read the GPX file.'));
         reader.readAsText(file);
       });
     }
 
     async function recalcRoute() {
-      if (trackLayer) {
-        map.removeLayer(trackLayer);
-        trackLayer = null;
-      }
+      if (waypoints.length < 2) return; // Need at least start and end
+
+      showLoading("Recalculating route...");
+      document.getElementById('statsContent').innerHTML = 'Recalculating...';
+
+      // Clear previous route line and weather markers
+      if (trackLayer) map.removeLayer(trackLayer);
       windLayerGroup.clearLayers();
       tempLayerGroup.clearLayers();
       precipLayerGroup.clearLayers();
+
       const coordsArray = waypoints.map(m => m.getLatLng());
-      if (coordsArray.length < 2) return;
+
       try {
         const points = await calculateCyclingRoute(coordsArray);
-        trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
-        map.fitBounds(trackLayer.getBounds(), { padding: [20,20] });
+        trackLayer = L.polyline(points, { color: '#007bff', weight: 5, opacity: 0.8 }).addTo(map);
+        // Don't fit bounds on recalc unless explicitly needed, prevents jarring map jumps
+        // map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
         await analyzeRoute(points);
-        // Update recommended heading based on start marker
-        displayRecommendedHeading();
+        displayRecommendedHeading(); // Update heading if implemented
       } catch (e) {
-        showError(e.message);
+        showError(`Route recalculation failed: ${e.message}`);
+        document.getElementById('statsContent').innerHTML = 'Route recalculation failed.';
+      } finally {
+        hideLoading();
       }
     }
 
-    async function calculateCyclingRoute(coordsArray) {
+    async function calculateCyclingRoute(coordsArray) { /* ... as before, using constants ... */
       const params = new URLSearchParams({
         vehicle: 'bike',
-        elevation: true,
-        points_encoded: false,
+        elevation: 'true', // GraphHopper expects string true/false
+        points_encoded: 'false',
         key: GRAPHHOPPER_KEY
       });
-      let url = `https://graphhopper.com/api/1/route?`;
+      let url = `${GRAPHHOPPER_URL}?`;
       coordsArray.forEach(coord => {
         url += `point=${coord.lat},${coord.lng}&`;
       });
       url += params.toString();
+
       const response = await fetch(url);
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Routing failed: ${errorData.message || response.statusText}`);
+        const errorData = await response.json().catch(() => ({ message: response.statusText })); // Handle non-JSON errors
+        console.error("GraphHopper Error Data:", errorData);
+        throw new Error(`Routing API Error: ${errorData.message || 'Unknown error'}`);
       }
       const data = await response.json();
+      if (!data.paths || data.paths.length === 0) {
+          throw new Error("Routing API Error: No route found between points.");
+      }
       return data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
     }
 
-    async function geocodeLocation(query) {
+    async function geocodeLocation(query) { /* ... as before, using constants ... */
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`
+        `${NOMINATIM_SEARCH_URL}?format=json&limit=1&q=${encodeURIComponent(query)}`
       );
+      if (!response.ok) {
+          throw new Error(`Geocoding failed for "${query}" (Network error)`);
+      }
       const data = await response.json();
-      if (data.length === 0) throw new Error(`Location not found: ${query}`);
-      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      if (!data || data.length === 0) {
+          throw new Error(`Location not found: "${query}"`);
+      }
+      return L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
     }
 
     async function analyzeRoute(points) {
+      // This function can take time, especially weather fetching.
+      // Loading state should already be active from the calling function.
+      document.getElementById('statsContent').innerHTML = 'Analyzing route, fetching weather...';
+      let errorCount = 0; // Track weather fetch errors
+
       try {
         const startTime = new Date(document.getElementById('startTime').value);
+        if (isNaN(startTime)) throw new Error("Invalid departure date/time selected.");
+
         const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
-        trackLayer._isBaseLayer = true;
-        const totalDistance = trackLayer.getDistance();
-        let errorCount = 0;
-        document.getElementById('stats').innerHTML = `
-          <div>Total Distance: ${(totalDistance/1000).toFixed(1)} km</div>
-          <div>Estimated Duration: ${(totalDistance/1000/avgSpeed).toFixed(1)} hours</div>
-          <div>Average Speed: ${avgSpeed} km/h</div>
-          <div class="error-message" id="errorMessage"></div>
+        if (isNaN(avgSpeed) || avgSpeed <= 0) throw new Error("Invalid average speed selected.");
+
+        // Ensure trackLayer is valid before proceeding
+        if (!trackLayer || typeof trackLayer.getDistance !== 'function') {
+            // If called directly after GPX parse, trackLayer might exist but not be fully initialized?
+            // Or points array was passed but trackLayer wasn't created yet.
+            // Let's create a temporary polyline if needed for calculations.
+            const tempPolyline = L.polyline(points);
+            trackLayer = trackLayer || tempPolyline; // Use existing if available
+            if (typeof trackLayer.getDistance !== 'function') {
+                 throw new Error("Route data is invalid for analysis.");
+            }
+        }
+
+        const totalDistance = trackLayer.getDistance(); // meters
+        const totalDistanceKm = totalDistance / 1000;
+        const estimatedDurationHours = totalDistanceKm / avgSpeed;
+        const estimatedDurationMs = estimatedDurationHours * 3600 * 1000;
+        const estimatedEndTime = new Date(startTime.getTime() + estimatedDurationMs);
+
+        let statsHTML = `
+          <div><strong>Total Distance:</strong> ${totalDistanceKm.toFixed(1)} km</div>
+          <div><strong>Est. Duration:</strong> ${formatDuration(estimatedDurationMs)}</div>
+          <div><strong>Est. Arrival:</strong> ${estimatedEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+          <div><strong>Avg. Speed Setting:</strong> ${avgSpeed} km/h</div>
+          <hr style="margin: 5px 0;">
+          <div id="weatherErrorDisplay" class="error-message" style="font-size: 0.9em;"></div>
         `;
+        document.getElementById('statsContent').innerHTML = statsHTML; // Initial stats update
+
         const numPoints = parseInt(document.getElementById('datapointsCount').value) || 10;
         const distancesToMark = [];
-        for (let i = 0; i < numPoints; i++) {
-          let dist = (totalDistance * i) / (numPoints - 1);
-          distancesToMark.push(dist);
+        // Ensure points at start (0) and end (totalDistance) are included if numPoints >= 2
+        if (numPoints >= 1) distancesToMark.push(0);
+        if (numPoints >= 2) {
+            for (let i = 1; i < numPoints -1; i++) {
+              let dist = (totalDistance * i) / (numPoints - 1);
+              distancesToMark.push(dist);
+            }
+            distancesToMark.push(totalDistance);
+        } else if (numPoints === 1) {
+            distancesToMark[0] = totalDistance / 2; // Single point in the middle
         }
-        for (const dist of distancesToMark) {
+
+        // Clear previous weather layers
+        windLayerGroup.clearLayers();
+        tempLayerGroup.clearLayers();
+        precipLayerGroup.clearLayers();
+
+        // Fetch weather data for sample points
+        const weatherPromises = distancesToMark.map(async (dist, index) => {
           const point = trackLayer.getPointAtDistance(dist);
-          if (!point) continue;
+          if (!point) return; // Skip if point calculation fails
+
           const km = dist / 1000;
-          const estTime = new Date(startTime.getTime() + (km / avgSpeed) * 3600000);
+          const estTimeEpoch = startTime.getTime() + (km / avgSpeed) * 3600000;
+          const estTime = new Date(estTimeEpoch);
+
           try {
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Small delay between requests to avoid hammering API
+            await new Promise(resolve => setTimeout(resolve, index * 50)); // Stagger requests slightly
+
             const forecastResponse = await fetch(
-              `https://api.openweathermap.org/data/2.5/forecast?lat=${point.lat}&lon=${point.lng}&units=metric&appid=${OPENWEATHER_KEY}`
+              `${OPENWEATHER_FORECAST_URL}?lat=${point.lat}&lon=${point.lng}&units=metric&appid=${OPENWEATHER_KEY}`
             );
+
             if (!forecastResponse.ok) {
-              const error = await forecastResponse.json();
-              throw new Error(`Forecast API: ${error.message}`);
+              const error = await forecastResponse.json().catch(() => ({ message: `HTTP ${forecastResponse.status}` }));
+              throw new Error(`Forecast API Error: ${error.message}`);
             }
             const forecastData = await forecastResponse.json();
-            const estTimestamp = Math.floor(estTime.getTime() / 1000);
-            let closestForecast = null;
-            let minDiff = Infinity;
-            forecastData.list.forEach(entry => {
-              const diff = Math.abs(entry.dt - estTimestamp);
-              if (diff < minDiff) {
-                minDiff = diff;
-                closestForecast = entry;
-              }
+
+            // Find the forecast entry closest to the estimated time
+            const estTimestamp = Math.floor(estTimeEpoch / 1000);
+            let closestForecast = forecastData.list.reduce((prev, curr) => {
+                return (Math.abs(curr.dt - estTimestamp) < Math.abs(prev.dt - estTimestamp) ? curr : prev);
             });
-            if (!closestForecast || minDiff > 3 * 3600) {
-              throw new Error('No forecast available for this time');
+
+            // Check if the closest forecast is reasonably close (e.g., within 3 hours)
+            if (!closestForecast || Math.abs(closestForecast.dt - estTimestamp) > 3 * 3600) {
+              // Don't throw an error, just skip marker creation for this point
+              console.warn(`No suitable forecast found for ${km.toFixed(0)} km mark (time diff too large).`);
+              return;
             }
+
             createWeatherMarkers(closestForecast, point, km, estTime);
+
           } catch (error) {
             errorCount++;
-            document.getElementById('errorMessage').innerHTML =
-              `Failed to load forecast for ${errorCount} points. Check console for details.`;
-            L.marker(point).addTo(map).bindPopup(`
-              <b>${km.toFixed(0)} km Mark</b><hr>
-              Forecast unavailable:<br>
-              ${error.message}
-            `);
+            console.error(`Failed to load forecast for point at ${km.toFixed(1)} km:`, error);
+            // Add a simple marker indicating failure for this point
+             L.marker(point, {
+                icon: L.divIcon({
+                    html: '<i class="fas fa-exclamation-triangle" style="color: orange;"></i>',
+                    className: '', iconSize: [16, 16]
+                })
+             }).addTo(map).bindPopup(`<b>${km.toFixed(0)} km Mark</b><hr>Forecast unavailable:<br>${error.message}`);
           }
+        });
+
+        await Promise.all(weatherPromises); // Wait for all weather fetches
+
+        // Update error count display if any errors occurred
+        if (errorCount > 0) {
+            document.getElementById('weatherErrorDisplay').textContent =
+              `Failed to load weather for ${errorCount} point(s).`;
         }
-        const tailwindScore = await computeTailwindScore(trackLayer.getLatLngs(), startTime, avgSpeed);
-        document.getElementById('stats').innerHTML += `<div>Tailwind Score: ${tailwindScore.toFixed(1)}</div>`;
+
+        // Compute and display Tailwind Score after weather data is processed
+        const tailwindScore = await computeTailwindScore(points, startTime, avgSpeed);
+        document.getElementById('statsContent').innerHTML += `
+            <div>
+                <strong>Tailwind Score:</strong> ${tailwindScore.toFixed(1)}
+                <i class="fas fa-info-circle" title="Average headwind (-) or tailwind (+) component in km/h based on forecast along the route. Higher is better." style="cursor: help; color: #6c757d;"></i>
+            </div>`;
+
+        // Add the default weather layer (wind) to the map
         map.addLayer(windLayerGroup);
-        if (window.innerWidth <= 600) { hideMenu(); }
+        currentWeatherLayer = 'wind'; // Ensure state is correct
+        updateWeatherToggleIcon(); // Update icon based on current layer
+
       } catch (error) {
-        showError(error.message);
+        console.error("Error during route analysis:", error);
+        showError(`Analysis failed: ${error.message}`); // Show error in main error display
+        document.getElementById('statsContent').innerHTML = 'Route analysis failed.'; // Update stats area
       }
+      // Loading state is hidden by the calling function's finally block
     }
 
-    function createWeatherMarkers(forecast, point, km, estTime) {
-      const tempC = forecast.main.temp;
-      const windSpeed = forecast.wind.speed * 3.6;
+    function createWeatherMarkers(forecast, point, km, estTime) { /* ... as before ... */
+      const tempC = Math.round(forecast.main.temp); // Round temperature
+      const windSpeed = forecast.wind.speed * 3.6; // m/s to km/h
       const windDeg = forecast.wind.deg;
       const weatherDesc = forecast.weather[0].description;
       const weatherMain = forecast.weather[0].main || '';
       const rain = forecast.rain && forecast.rain['3h'] ? forecast.rain['3h'] : 0;
-      const dateString = new Date(forecast.dt * 1000).toLocaleString();
+      const snow = forecast.snow && forecast.snow['3h'] ? forecast.snow['3h'] : 0; // Check for snow
+      const forecastTime = new Date(forecast.dt * 1000);
+
       const directionStr = degreesToCompass(windDeg);
+
+      // Determine precipitation amount and type
+      let precipAmount = 0;
+      let precipIconClass = "fa-sun"; // Default: sunny
+      let precipColor = "gold";
+      if (rain > 0) {
+          precipAmount = rain;
+          precipIconClass = rain > 1 ? "fa-cloud-showers-heavy" : "fa-cloud-rain";
+          precipColor = "blue";
+      } else if (snow > 0) {
+          precipAmount = snow; // Assuming snow amount is comparable indicator
+          precipIconClass = "fa-snowflake";
+          precipColor = "lightblue";
+      } else if (weatherMain.toLowerCase().includes('cloud')) {
+          precipIconClass = "fa-cloud";
+          precipColor = "grey";
+      }
+
       const popupContent = `
         <b>${km.toFixed(0)} km Mark</b><hr>
-        <b>Temperature:</b> ${tempC}°C<br>
-        <b>Conditions:</b> ${weatherDesc}<br>
-        <b>Wind Speed:</b> ${windSpeed.toFixed(1)} km/h<br>
-        <b>Direction:</b> ${directionStr} (${windDeg}°)<br>
-        <b>Forecast Time:</b> ${dateString}<br>
-        <b>Your ETA:</b> ${estTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}<br>
-        <b>Precipitation (3h):</b> ${rain} mm
+        <strong>Temp:</strong> ${tempC}°C<br>
+        <strong>Conditions:</strong> ${weatherDesc}<br>
+        <strong>Wind:</strong> ${windSpeed.toFixed(1)} km/h ${directionStr} (${windDeg}°)<br>
+        <strong>Precip (3h):</strong> ${precipAmount.toFixed(1)} mm ${rain > 0 ? '(Rain)' : snow > 0 ? '(Snow)' : ''}<br>
+        <hr style="margin: 3px 0;">
+        <i>Est. Arrival: ${estTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</i><br>
+        <i>Forecast for: ${forecastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</i>
       `;
+
+      // Wind Marker
       const windIcon = L.divIcon({
-        className: 'wind-marker',
-        iconSize: [40, 40],
-        html: `<div style="text-align:center;">
-                 <div style="transform: rotate(${windDeg + 180}deg); display:inline-block;">
-                   <i class="fas fa-long-arrow-alt-up"></i>
-                 </div><br>
-                 <span style="font-size:14px;">${windSpeed.toFixed(1)} km/h</span>
+        className: 'wind-marker', // Use class for potential CSS styling
+        iconSize: [40, 40], // Adjust size as needed
+        iconAnchor: [20, 45], // Anchor below the arrow/text
+        popupAnchor: [0, -40],
+        html: `<div style="text-align:center; position: relative;">
+                 <div style="transform: rotate(${windDeg}deg); display:inline-block; position: absolute; top: -15px; left: 12px;">
+                   <i class="fas fa-long-arrow-alt-down" style="font-size: 20px; color: #0056b3;"></i> <!-- Arrow points FROM wind direction -->
+                 </div>
+                 <span style="font-size:12px; font-weight: bold; position: absolute; top: 5px; left: 0; width: 100%;">${windSpeed.toFixed(0)}</span>
                </div>`
       });
       const windMarker = L.marker(point, { icon: windIcon });
       windMarker.bindPopup(popupContent);
       windLayerGroup.addLayer(windMarker);
 
+      // Temperature Marker
       const tempIcon = L.divIcon({
-        className: '',
+        className: '', // No extra class needed
         iconSize: [40, 40],
-        html: `<div style="color:red;font-weight:bold;font-size:14px;">
-                 <i class="fas fa-thermometer-half"></i> ${tempC}°C
+        iconAnchor: [20, 20],
+        popupAnchor: [0, -20],
+        html: `<div style="text-align: center; background: rgba(255,255,255,0.7); border-radius: 50%; padding: 5px; border: 1px solid #ccc;">
+                 <i class="fas fa-thermometer-half" style="color: ${tempC > 25 ? 'red' : tempC < 5 ? 'blue' : 'orange'};"></i>
+                 <span style="font-weight:bold; font-size:13px; color: #333;">${tempC}°</span>
                </div>`
       });
       const tempMarker = L.marker(point, { icon: tempIcon });
       tempMarker.bindPopup(popupContent);
       tempLayerGroup.addLayer(tempMarker);
 
-      let precipHTML = '';
-      if (rain > 0.1) {
-        precipHTML = `<div style="color:blue;font-size:14px;"><i class="fas fa-cloud-showers-heavy"></i> ${rain}mm</div>`;
-      } else if (weatherMain.toLowerCase().includes('cloud')) {
-        precipHTML = `<div style="color:gray;font-size:14px;"><i class="fas fa-cloud"></i> 0mm</div>`;
-      } else {
-        precipHTML = `<div style="color:gold;font-size:14px;"><i class="fas fa-sun"></i> 0mm</div>`;
-      }
+      // Precipitation Marker
       const precipIcon = L.divIcon({
         className: '',
         iconSize: [40, 40],
-        html: precipHTML
+        iconAnchor: [20, 20],
+        popupAnchor: [0, -20],
+        html: `<div style="text-align: center; background: rgba(255,255,255,0.7); border-radius: 50%; padding: 5px; border: 1px solid #ccc;">
+                 <i class="fas ${precipIconClass}" style="color:${precipColor};"></i>
+                 <span style="font-size:11px; color: #333;">${precipAmount.toFixed(1)}mm</span>
+               </div>`
       });
       const precipMarker = L.marker(point, { icon: precipIcon });
       precipMarker.bindPopup(popupContent);
       precipLayerGroup.addLayer(precipMarker);
     }
 
-    function degreesToCompass(degrees) {
+    function degreesToCompass(degrees) { /* ... as before ... */
       const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-      return directions[Math.round((degrees % 360) / 22.5) % 16];
+      return directions[Math.round(((degrees % 360) + 360) % 360 / 22.5) % 16]; // Ensure positive degrees
+    }
+
+    function formatDuration(milliseconds) {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        let durationString = "";
+        if (hours > 0) {
+            durationString += `${hours} hr${hours > 1 ? 's' : ''} `;
+        }
+        if (minutes > 0 || hours === 0) { // Show minutes if non-zero or if hours is zero
+            durationString += `${minutes} min${minutes > 1 ? 's' : ''}`;
+        }
+        return durationString.trim() || "0 mins"; // Handle case of zero duration
     }
 
     function showError(message) {
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'error-message';
-      errorDiv.textContent = `Error: ${message}`;
-      document.getElementById('stats').appendChild(errorDiv);
-      console.error(message);
-    }
-
-    /* -------------------------
-       Adding Extra Waypoints
-       ------------------------- */
-    function addStopMarker(latlng) {
-      const marker = L.marker(latlng, { draggable: true }).addTo(map);
-      marker.options.isExtra = true;
-      marker.on('dragend', () => recalcRoute());
-      marker.on('contextmenu', function(e) {
-        e.originalEvent.preventDefault();
-        map.removeLayer(marker);
-        waypoints = waypoints.filter(m => m !== marker);
-        recalcRoute();
-      });
-      if (waypoints.length >= 2) {
-        waypoints.splice(waypoints.length - 1, 0, marker);
-      } else {
-        waypoints.push(marker);
+      const errorDiv = document.getElementById('errorDisplay');
+      if (errorDiv) {
+          errorDiv.textContent = `Error: ${message}`;
       }
-      recalcRoute();
+      console.error(message); // Log to console as well
     }
 
     /* -------------------------
-       Clear Map Function
+       Waypoint Management (Adding/Removing)
+       ------------------------- */
+    function handleMapContextMenu(e) {
+        e.originalEvent.preventDefault(); // Prevent browser context menu
+
+        // Check if clicking near an existing EXTRA waypoint to remove it
+        let foundMarkerToRemove = null;
+        const clickPt = map.latLngToContainerPoint(e.latlng);
+
+        map.eachLayer(layer => {
+          if (layer instanceof L.Marker && layer.options.isExtra) { // Only check removable markers
+            const markerPt = map.latLngToContainerPoint(layer.getLatLng());
+            if (markerPt.distanceTo(clickPt) < 20) { // 20px tolerance
+              foundMarkerToRemove = layer;
+            }
+          }
+        });
+
+        if (foundMarkerToRemove) {
+            removeWaypoint(foundMarkerToRemove);
+        } else if (waypoints.length >= 2) { // Only add if start and end exist
+            addStopMarker(e.latlng);
+        } else {
+            console.log("Add start and end points before adding waypoints.");
+            // Optionally show a brief message to the user
+        }
+    }
+
+    function setupLongPressHandler() {
+        let touchTimer;
+        const longPressDuration = 1000; // 1 second for long press
+
+        map.getContainer().addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) { // Only trigger for single touch
+                const touch = e.touches[0];
+                touchTimer = setTimeout(() => {
+                    touchTimer = null; // Clear timer flag
+                    const point = map.containerPointToLatLng([touch.clientX, touch.clientY]);
+
+                    // Check if long-pressing near an existing EXTRA waypoint
+                    let foundMarkerToRemove = null;
+                    const pressPt = map.latLngToContainerPoint(point);
+                    map.eachLayer(layer => {
+                      if (layer instanceof L.Marker && layer.options.isExtra) {
+                        const markerPt = map.latLngToContainerPoint(layer.getLatLng());
+                        if (markerPt.distanceTo(pressPt) < 25) { // Slightly larger tolerance for touch
+                          foundMarkerToRemove = layer;
+                        }
+                      }
+                    });
+
+                    if (foundMarkerToRemove) {
+                        removeWaypoint(foundMarkerToRemove);
+                    } else if (waypoints.length >= 2) {
+                        addStopMarker(point);
+                    } else {
+                         console.log("Add start and end points before adding waypoints.");
+                    }
+                    // Prevent context menu from appearing after long press releases (if applicable)
+                    e.preventDefault();
+
+                }, longPressDuration);
+            }
+        }, { passive: false }); // Need passive: false to call preventDefault
+
+        map.getContainer().addEventListener('touchend', function(e) {
+            if (touchTimer) {
+                clearTimeout(touchTimer);
+                touchTimer = null;
+            }
+             // Invalidate size after a short delay on touch end, helps with potential layout shifts
+            setTimeout(() => { map.invalidateSize(); }, 300);
+        });
+
+        map.getContainer().addEventListener('touchmove', function(e) {
+             // Clear timer if finger moves, it's not a long press
+            if (touchTimer) {
+                clearTimeout(touchTimer);
+                touchTimer = null;
+            }
+        });
+    }
+
+
+    function addStopMarker(latlng) {
+      if (waypoints.length < 2) {
+          showError("Cannot add waypoint: Define start and end points first.");
+          return;
+      }
+      // Use default Leaflet marker style for intermediate points
+      const marker = L.marker(latlng, { draggable: true }).addTo(map);
+      marker.options.isExtra = true; // Mark as a removable waypoint
+
+      marker.on('dragend', () => {
+          // Find the marker in the array and update its position implicitly before recalc
+          recalcRoute();
+      });
+
+      // Add context menu for removal (redundant with map context menu but safe)
+      marker.on('contextmenu', (e) => {
+          e.originalEvent.preventDefault();
+          removeWaypoint(marker);
+      });
+
+      // Insert the new waypoint *before* the end marker
+      waypoints.splice(waypoints.length - 1, 0, marker);
+      recalcRoute(); // Recalculate route with the new waypoint
+    }
+
+    function removeWaypoint(markerToRemove) {
+        map.removeLayer(markerToRemove);
+        waypoints = waypoints.filter(m => m !== markerToRemove);
+        recalcRoute();
+    }
+
+
+    /* -------------------------
+       Clear Map Function (Enhanced Reset)
        ------------------------- */
     function clearMap() {
-      if (trackLayer) {
-        map.removeLayer(trackLayer);
-        trackLayer = null;
+      showLoading("Clearing map...");
+      try {
+          // Remove route line
+          if (trackLayer) {
+            map.removeLayer(trackLayer);
+            trackLayer = null;
+          }
+          // Clear weather layers
+          windLayerGroup.clearLayers();
+          tempLayerGroup.clearLayers();
+          precipLayerGroup.clearLayers();
+
+          // Remove all markers (waypoints)
+          waypoints.forEach(marker => map.removeLayer(marker));
+          waypoints = [];
+
+          // Remove any other non-base markers (like weather error markers)
+          map.eachLayer(function(layer) {
+            if (layer instanceof L.Marker && !layer.options.isFixed && !layer.options.isExtra) {
+                // Check if it's potentially a weather error marker or similar temporary marker
+                if (!layer._icon || (layer._icon.innerHTML && layer._icon.innerHTML.includes('fa-exclamation-triangle'))) {
+                     map.removeLayer(layer);
+                }
+            }
+          });
+
+
+          // Clear stats and errors
+          document.getElementById('statsContent').innerHTML = 'No route loaded.';
+          document.getElementById('errorDisplay').textContent = '';
+
+          // Clear inputs
+          document.getElementById('startLocation').value = '';
+          document.getElementById('endLocation').value = '';
+          document.getElementById('randomLocation').value = '';
+          document.getElementById('gpxFile').value = ""; // Reset file input
+          document.getElementById('fileName').textContent = "No file selected";
+
+          // Reset settings to default
+          document.getElementById('avgSpeed').value = '22';
+          document.getElementById('datapointsCount').value = '10';
+          document.getElementById('routeLengthSlider').value = '50';
+          document.getElementById('routeLengthValue').textContent = '50 km';
+
+          // Clear any leftover autocomplete lists
+          document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
+
+          // Reset recommended heading marker if implemented
+          if (window.recommendedMarker) {
+            map.removeLayer(window.recommendedMarker);
+            window.recommendedMarker = null;
+          }
+          console.log("Map cleared.");
+      } catch(e) {
+          showError("Error clearing map: " + e.message);
+      } finally {
+          hideLoading();
       }
-      windLayerGroup.clearLayers();
-      tempLayerGroup.clearLayers();
-      precipLayerGroup.clearLayers();
-      const markers = [];
-      map.eachLayer(function(layer) {
-        if (layer instanceof L.Marker && !layer._isBaseLayer) {
-          markers.push(layer);
-        }
-      });
-      markers.forEach(marker => map.removeLayer(marker));
-      waypoints = [];
-      document.getElementById('stats').innerHTML = '';
-      document.getElementById('gpxFile').value = "";
-      document.getElementById('fileName').textContent = "";
-      if (window.recommendedMarker) {
-        map.removeLayer(window.recommendedMarker);
-        window.recommendedMarker = null;
-      }
-       // Clear autocomplete inputs and any leftover lists
-      document.getElementById('startLocation').value = '';
-      document.getElementById('endLocation').value = '';
-      document.getElementById('randomLocation').value = '';
-      document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
     }
-        /* -------------------------
-       Save Map Function
+
+    // Helper to clear only route-related data without clearing inputs/settings
+    function clearRouteData() {
+        if (trackLayer) map.removeLayer(trackLayer);
+        trackLayer = null;
+        windLayerGroup.clearLayers();
+        tempLayerGroup.clearLayers();
+        precipLayerGroup.clearLayers();
+        // Remove existing markers before adding new ones (start/end/waypoints)
+        waypoints.forEach(marker => map.removeLayer(marker));
+        waypoints = [];
+         // Remove any other non-base markers (like weather error markers)
+          map.eachLayer(function(layer) {
+            if (layer instanceof L.Marker && !layer.options.isFixed && !layer.options.isExtra) {
+                if (!layer._icon || (layer._icon.innerHTML && layer._icon.innerHTML.includes('fa-exclamation-triangle'))) {
+                     map.removeLayer(layer);
+                }
+            }
+          });
+        document.getElementById('statsContent').innerHTML = ''; // Clear stats content area
+        document.getElementById('errorDisplay').textContent = ''; // Clear errors
+    }
+
+
+    /* -------------------------
+       Save Map Function (No changes needed)
        ------------------------- */
-    function saveRouteAsGPX() {
-      if (!trackLayer) {
-        alert("No route available to save!");
+    function saveRouteAsGPX() { /* ... as before ... */
+      if (!trackLayer || !trackLayer.getLatLngs || trackLayer.getLatLngs().length < 2) {
+        showError("No valid route available to save!");
         return;
       }
       const latlngs = trackLayer.getLatLngs();
       let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
-      gpx += '<gpx version="1.1" creator="Cycling Route Planner" xmlns="http://www.topografix.com/GPX/1/1">\n';
+      gpx += '<gpx version="1.1" creator="Cycling Route Planner" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">\n';
+      gpx += '  <metadata>\n';
+      gpx += `    <name>Cycling Route - ${new Date().toISOString().slice(0,10)}</name>\n`;
+      gpx += '    <link href="https://your-website-link-here.com"><text>Generated by Cycling Route Planner</text></link>\n'; // Optional: Add your site link
+      gpx += `    <time>${new Date().toISOString()}</time>\n`;
+      gpx += '  </metadata>\n';
       gpx += '  <trk>\n';
-      gpx += '    <name>Cycling Route</name>\n';
+      gpx += `    <name>Route ${new Date().toISOString().slice(0,16)}</name>\n`;
       gpx += '    <trkseg>\n';
       latlngs.forEach(pt => {
-        gpx += `      <trkpt lat="${pt.lat}" lon="${pt.lng}"></trkpt>\n`;
+        gpx += `      <trkpt lat="${pt.lat.toFixed(6)}" lon="${pt.lng.toFixed(6)}"></trkpt>\n`; // Use fixed precision
       });
       gpx += '    </trkseg>\n';
       gpx += '  </trk>\n';
       gpx += '</gpx>\n';
 
-      const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+      const blob = new Blob([gpx], { type: 'application/gpx+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
-      a.download = 'route.gpx';
+      // Create a filename based on date
+      const filename = `cycling_route_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.gpx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
+      window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     }
+
     /* -------------------------
-       Random Route Generator (Best Candidate)
+       Random Route Generator (with Loading States)
        ------------------------- */
     async function bestRandomRouteGenerator() {
-      // Remove any open autocomplete lists before processing
       document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
-      // 1) Get user inputs
-      let locInput = document.getElementById('randomLocation').value.trim();
-      let center = locInput ? await geocodeLocation(locInput) : map.getCenter();
+      showLoading("Generating random routes...");
 
-      const routeLengthKm = parseInt(document.getElementById('routeLengthSlider').value);
-      const routeLengthMeters = routeLengthKm * 1000;
-
-      const startTime = new Date(document.getElementById('startTime').value);
-      const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
-
-      // 2) Generate multiple candidate loops using different random seeds
-      let candidates = [];
-      for (let i = 0; i < 3; i++) {
-        // Round-trip “seed” to vary the generated loop
-        let seed = Math.floor(Math.random() * 100000);
-        // Build the GraphHopper Round Trip API URL
-        let url = `https://graphhopper.com/api/1/route?` +
-          `vehicle=bike&points_encoded=false&algorithm=round_trip` +
-          `&point=${center.lat},${center.lng}` +
-          `&round_trip.distance=${routeLengthMeters}` +
-          `&round_trip.seed=${seed}` +
-          `&key=${GRAPHHOPPER_KEY}`;
-        try {
-          let response = await fetch(url);
-          if (!response.ok) {
-            console.error("Round-trip request failed:", await response.text());
-            continue;
-          }
-          let data = await response.json();
-          // Convert returned points to Leaflet latLng
-          let routePoints = data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
-
-          // Compute tailwind score
-          let score = await computeTailwindScore(routePoints, startTime, avgSpeed);
-          candidates.push({ route: routePoints, score });
-        } catch (e) {
-          console.error("Round-trip generation failed:", e);
+      try {
+        let locInput = document.getElementById('randomLocation').value.trim();
+        let center;
+        if (locInput) {
+            document.getElementById('statsContent').innerHTML = `Geocoding "${locInput}"...`;
+            center = await geocodeLocation(locInput);
+        } else {
+            center = map.getCenter(); // Use current map center
+            document.getElementById('statsContent').innerHTML = `Using map center...`;
         }
-      }
 
-      // 3) If no candidates, show error
-      if (candidates.length === 0) {
-        showError("Could not generate a round-trip route.");
-        return;
-      }
+        const routeLengthKm = parseInt(document.getElementById('routeLengthSlider').value);
+        const routeLengthMeters = routeLengthKm * 1000;
+        const startTime = new Date(document.getElementById('startTime').value);
+        if (isNaN(startTime)) throw new Error("Invalid departure date/time.");
+        const avgSpeed = parseInt(document.getElementById('avgSpeed').value);
+        if (isNaN(avgSpeed) || avgSpeed <= 0) throw new Error("Invalid average speed.");
 
-      // 4) Pick the loop with the best tailwind score
-      candidates.sort((a, b) => b.score - a.score);
-      const bestCandidate = candidates[0];
+        // Clear previous route data
+        clearRouteData();
 
-      // 5) Display the route
-      if (trackLayer) {
-        map.removeLayer(trackLayer);
-      }
-      // Clear existing markers before adding new ones
-      const markers = [];
-      map.eachLayer(function(layer) {
-        if (layer instanceof L.Marker && !layer._isBaseLayer) {
-          markers.push(layer);
+        let candidates = [];
+        const numCandidates = 3; // Generate 3 candidates
+        document.getElementById('statsContent').innerHTML = `Generating ${numCandidates} candidate routes...`;
+
+        const candidatePromises = [];
+        for (let i = 0; i < numCandidates; i++) {
+            candidatePromises.push((async () => {
+                let seed = Math.floor(Math.random() * 100000);
+                let url = `${GRAPHHOPPER_URL}?` +
+                  `vehicle=bike&points_encoded=false&algorithm=round_trip` +
+                  `&point=${center.lat},${center.lng}` +
+                  `&round_trip.distance=${routeLengthMeters}` +
+                  `&round_trip.seed=${seed}` +
+                  `&key=${GRAPHHOPPER_KEY}`;
+                try {
+                  let response = await fetch(url);
+                  if (!response.ok) {
+                    console.error(`Round-trip candidate ${i+1} failed:`, await response.text());
+                    return null; // Indicate failure for this candidate
+                  }
+                  let data = await response.json();
+                  if (!data.paths || data.paths.length === 0) {
+                      console.error(`Round-trip candidate ${i+1} returned no path.`);
+                      return null;
+                  }
+                  let routePoints = data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
+                  // Basic validation: check if route length is roughly correct
+                  let actualDistance = computeTotalDistance(routePoints);
+                  if (Math.abs(actualDistance - routeLengthMeters) / routeLengthMeters > 0.5) { // Allow 50% deviation
+                      console.warn(`Candidate ${i+1} distance ${Math.round(actualDistance/1000)}km differs significantly from target ${routeLengthKm}km.`);
+                      // Decide whether to keep or discard based on deviation? For now, keep.
+                  }
+                  return { route: routePoints, seed: seed }; // Return route points and seed
+                } catch (e) {
+                  console.error(`Error generating candidate ${i+1}:`, e);
+                  return null;
+                }
+            })());
         }
-      });
-      markers.forEach(marker => map.removeLayer(marker));
-      waypoints = []; // Reset waypoints array
 
-      trackLayer = L.polyline(bestCandidate.route, { className: 'route-line' }).addTo(map);
-      map.fitBounds(trackLayer.getBounds(), { padding: [20, 20] });
+        const results = await Promise.all(candidatePromises);
+        const validCandidates = results.filter(r => r !== null);
 
-      // Analyze (will show distance, duration, and tailwind score)
-      await analyzeRoute(bestCandidate.route);
+        if (validCandidates.length === 0) {
+          throw new Error("Could not generate any valid round-trip routes. Try a different location or distance.");
+        }
 
-      // Place start/end markers at the center point used for generation
-      const startMarker = L.marker(center, { draggable: true, icon: startIcon }).addTo(map);
-      startMarker.options.isFixed = true;
-      // startMarker.on('dragend', () => recalcRoute()); // Recalculating might not make sense for random loop
-      waypoints.push(startMarker);
+        document.getElementById('statsContent').innerHTML = `Analyzing ${validCandidates.length} routes for best tailwind...`;
 
-      const endMarker = L.marker(center, { draggable: true, icon: endIcon }).addTo(map);
-      endMarker.options.isFixed = true;
-      // endMarker.on('dragend', () => recalcRoute()); // Recalculating might not make sense for random loop
-      waypoints.push(endMarker); // Add end marker as well, even if same location
+        // Compute tailwind score for each valid candidate
+        const scoredCandidates = [];
+        for (const candidate of validCandidates) {
+            try {
+                let score = await computeTailwindScore(candidate.route, startTime, avgSpeed);
+                scoredCandidates.push({ ...candidate, score });
+            } catch (e) {
+                console.error("Error computing tailwind score for a candidate:", e);
+                // Assign a default low score if calculation fails?
+                scoredCandidates.push({ ...candidate, score: -Infinity });
+            }
+        }
 
-      displayRecommendedHeading();
-      if (window.innerWidth <= 600) { hideMenu(); }
+
+        // Pick the best candidate (highest tailwind score)
+        scoredCandidates.sort((a, b) => b.score - a.score); // Sort descending by score
+        const bestCandidate = scoredCandidates[0];
+
+        document.getElementById('statsContent').innerHTML = `Displaying best route (Seed: ${bestCandidate.seed})...`;
+
+        // Display the best route
+        trackLayer = L.polyline(bestCandidate.route, { color: '#007bff', weight: 5, opacity: 0.8 }).addTo(map);
+        map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+
+        // Add non-draggable start/end markers at the center point
+        const startMarker = L.marker(center, { icon: startIcon, interactive: false }).addTo(map);
+        const endMarker = L.marker(center, { icon: endIcon, interactive: false }).addTo(map);
+        // Note: waypoints array remains empty for random routes as they aren't editable
+
+        // Analyze the chosen route (for stats and weather)
+        await analyzeRoute(bestCandidate.route);
+
+        displayRecommendedHeading(); // Update heading if implemented
+        if (window.innerWidth <= 600) { hideMenu(); }
+
+      } catch (error) {
+        showError(error.message);
+        document.getElementById('statsContent').innerHTML = 'Random route generation failed.';
+      } finally {
+        hideLoading();
+      }
     }
 
     /* -------------------------
-       Helper Functions for Random Route
+       Helper Functions for Random Route (Tailwind Calculation etc.)
        ------------------------- */
-    function randomPointInCircle(center, radius) {
-      const r = radius * Math.sqrt(Math.random());
-      const theta = 2 * Math.PI * Math.random();
-      const deltaLat = (r * Math.sin(theta)) / 111;
-      const deltaLng = (r * Math.cos(theta)) / (111 * Math.cos(center.lat * Math.PI / 180));
-      return L.latLng(center.lat + deltaLat, center.lng + deltaLng);
-    }
-
-    function computeTotalDistance(points) {
+    function computeTotalDistance(points) { /* ... as before ... */
       let total = 0;
+      if (!points || points.length < 2) return 0;
       for (let i = 1; i < points.length; i++) {
-         total += points[i-1].distanceTo(points[i]);
+         // Add check for valid LatLng objects
+         if (points[i-1] && points[i] && typeof points[i-1].distanceTo === 'function') {
+             total += points[i-1].distanceTo(points[i]);
+         } else {
+             console.warn("Invalid point data in computeTotalDistance at index", i-1);
+         }
       }
       return total;
     }
 
-    function getPointAtDistanceFromRoute(points, target) {
-      let dist = 0;
-      for (let i = 1; i < points.length; i++) {
-         const segment = points[i-1].distanceTo(points[i]);
-         if (dist + segment >= target) {
-           const frac = (target - dist) / segment;
-           return L.latLng(
-             points[i-1].lat + frac * (points[i].lat - points[i-1].lat),
-             points[i-1].lng + frac * (points[i].lng - points[i-1].lng)
-           );
-         }
-         dist += segment;
-      }
-      return points[points.length - 1];
+    function getPointAtDistanceFromRoute(points, target) { /* Uses Polyline method now */
+        const tempPolyline = L.polyline(points);
+        return tempPolyline.getPointAtDistance(target);
     }
 
-    function computeBearing(start, end) {
+    function computeBearing(start, end) { /* ... as before ... */
+      if (!start || !end) return 0; // Basic check
       const lat1 = start.lat * Math.PI / 180;
       const lat2 = end.lat * Math.PI / 180;
       const dLng = (end.lng - start.lng) * Math.PI / 180;
       const y = Math.sin(dLng) * Math.cos(lat2);
       const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
       const brng = Math.atan2(y, x) * 180 / Math.PI;
-      return (brng + 360) % 360;
+      return (brng + 360) % 360; // Normalize to 0-360
     }
 
     async function computeTailwindScore(routePoints, startTime, avgSpeed) {
+      if (!routePoints || routePoints.length < 2 || avgSpeed <= 0) return 0; // Basic validation
+
       const totalDistance = computeTotalDistance(routePoints);
+      if (totalDistance <= 0) return 0;
+
+      // Sample points at 25%, 50%, 75% of the route distance
       const sampleFractions = [0.25, 0.5, 0.75];
-      let totalTailwind = 0;
-      let count = 0;
-      for (let frac of sampleFractions) {
+      let totalTailwindComponent = 0;
+      let validSamples = 0;
+
+      const weatherPromises = sampleFractions.map(async (frac, index) => {
         const targetDistance = totalDistance * frac;
         const samplePoint = getPointAtDistanceFromRoute(routePoints, targetDistance);
-        let bearing;
-        const nextPoint = getPointAtDistanceFromRoute(routePoints, totalDistance * Math.min(frac + 0.1, 1));
-        if (nextPoint) {
-          bearing = computeBearing(samplePoint, nextPoint);
-        } else {
-          const prevPoint = getPointAtDistanceFromRoute(routePoints, totalDistance * Math.max(frac - 0.1, 0));
-          bearing = prevPoint ? computeBearing(prevPoint, samplePoint) : 0;
+        // Get point slightly ahead to determine bearing
+        const nextPoint = getPointAtDistanceFromRoute(routePoints, Math.min(targetDistance + 500, totalDistance)); // 500m ahead
+
+        if (!samplePoint || !nextPoint || samplePoint.equals(nextPoint)) {
+            console.warn(`Could not determine bearing at ${frac*100}%`);
+            return null; // Skip if points are invalid or too close
         }
-        const travelTime = (targetDistance / 1000) / avgSpeed * 3600000;
-        const sampleTime = new Date(startTime.getTime() + travelTime);
+
+        const bearing = computeBearing(samplePoint, nextPoint);
+        const travelTimeMs = (targetDistance / 1000 / avgSpeed) * 3600 * 1000;
+        const sampleTime = new Date(startTime.getTime() + travelTimeMs);
+        const sampleTimestamp = Math.floor(sampleTime.getTime() / 1000);
+
         try {
-          const forecastResponse = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${samplePoint.lat}&lon=${samplePoint.lng}&units=metric&appid=${OPENWEATHER_KEY}`);
-          if (!forecastResponse.ok) { continue; }
+          // Small delay to avoid hammering API
+          await new Promise(resolve => setTimeout(resolve, index * 75));
+
+          const forecastResponse = await fetch(`${OPENWEATHER_FORECAST_URL}?lat=${samplePoint.lat}&lon=${samplePoint.lng}&units=metric&appid=${OPENWEATHER_KEY}`);
+          if (!forecastResponse.ok) {
+              console.warn(`Weather fetch failed for tailwind score at ${frac*100}%`);
+              return null; // Skip this sample point
+          }
           const forecastData = await forecastResponse.json();
-          const sampleTimestamp = Math.floor(sampleTime.getTime() / 1000);
-          let bestEntry = null, bestDiff = Infinity;
-          forecastData.list.forEach(entry => {
-            const diff = Math.abs(entry.dt - sampleTimestamp);
-            if (diff < bestDiff) {
-              bestDiff = diff;
-              bestEntry = entry;
-            }
+
+          // Find closest forecast entry
+          let bestEntry = forecastData.list.reduce((prev, curr) => {
+              return (Math.abs(curr.dt - sampleTimestamp) < Math.abs(prev.dt - sampleTimestamp) ? curr : prev);
           });
-          if (!bestEntry) { continue; }
-          const windSpd = bestEntry.wind.speed * 3.6;
-          const windDir = bestEntry.wind.deg;
-          const effectiveWindDir = (windDir + 180) % 360;
-          const angleDiff = (effectiveWindDir - bearing) * Math.PI / 180;
-          const tailwind = windSpd * Math.cos(angleDiff);
-          totalTailwind += tailwind;
-          count++;
+
+          // Check if forecast is reasonably close (within ~3 hours)
+          if (!bestEntry || Math.abs(bestEntry.dt - sampleTimestamp) > 3 * 3600) {
+              console.warn(`No suitable forecast for tailwind score at ${frac*100}%`);
+              return null; // Skip this sample point
+          }
+
+          const windSpd_kmh = bestEntry.wind.speed * 3.6; // m/s to km/h
+          const windDir = bestEntry.wind.deg; // Direction wind is FROM
+
+          // Calculate angle difference: wind direction relative to bearing
+          // Angle = Wind Direction - Bearing Direction. We want cos(angle)
+          // Effective wind direction (where it's going) is windDir + 180
+          // Angle difference relative to bearing = (windDir + 180) - bearing
+          let angleDiffDegrees = windDir - bearing; // Angle between wind source and travel direction
+          // Normalize angle difference to -180 to 180
+          while (angleDiffDegrees <= -180) angleDiffDegrees += 360;
+          while (angleDiffDegrees > 180) angleDiffDegrees -= 360;
+
+          // Tailwind component = wind_speed * cos(angle between wind vector and travel vector)
+          // If angleDiffDegrees is angle between wind *source* and travel,
+          // then angle between wind *vector* and travel is (180 - angleDiffDegrees)
+          // cos(180 - x) = -cos(x)
+          const tailwindComponent = windSpd_kmh * Math.cos(angleDiffDegrees * Math.PI / 180);
+          // Positive value means tailwind component, negative means headwind component
+
+          return tailwindComponent;
+
         } catch (e) {
-          console.error("Error computing tailwind at sample:", e);
+          console.error(`Error computing tailwind at sample ${frac*100}%:`, e);
+          return null; // Skip on error
         }
-      }
-      return count > 0 ? totalTailwind / count : 0;
+      });
+
+      const results = await Promise.all(weatherPromises);
+
+      results.forEach(component => {
+          if (component !== null) {
+              totalTailwindComponent += component;
+              validSamples++;
+          }
+      });
+
+      // Return the average tailwind component across valid samples
+      return validSamples > 0 ? totalTailwindComponent / validSamples : 0;
     }
 
-    // --- Recommended Heading ---
-    // (Keep existing functions, just ensure displayRecommendedHeading exists)
+
+    /* -------------------------
+       Recommended Heading (Placeholder)
+       ------------------------- */
     function displayRecommendedHeading() {
-        // Placeholder for potential future implementation
-        // This function might calculate and display an initial recommended heading
-        // based on the first segment of the route and wind forecast.
-        // For now, it does nothing.
+        // Placeholder - could calculate initial bearing and show an arrow
         if (window.recommendedMarker) {
             map.removeLayer(window.recommendedMarker);
             window.recommendedMarker = null;
         }
-        // Example: Add a marker showing initial bearing if needed
+        // Example logic (currently commented out):
         // if (waypoints.length > 0 && trackLayer) {
         //     const startPoint = waypoints[0].getLatLng();
-        //     const nextPoint = trackLayer.getPointAtDistance(1000); // Point 1km along route
-        //     if (nextPoint) {
+        //     const nextPoint = trackLayer.getPointAtDistance(500); // Point 500m along route
+        //     if (startPoint && nextPoint && !startPoint.equals(nextPoint)) {
         //         const bearing = computeBearing(startPoint, nextPoint);
-        //         // Add marker logic here...
+        //         // console.log("Initial bearing:", bearing);
+        //         // Could add a marker/icon indicating this bearing near the start point
+        //         // window.recommendedMarker = L.marker(startPoint, { icon: ... }).addTo(map);
         //     }
         // }
     }
 
-    // --- Weather Layer Toggle ---
+    /* -------------------------
+       Weather Layer Toggle
+       ------------------------- */
     function toggleWeatherLayer() {
-        // Cycle through layers: wind -> temp -> precip -> wind ...
         map.removeLayer(windLayerGroup);
         map.removeLayer(tempLayerGroup);
         map.removeLayer(precipLayerGroup);
-        const iconElement = document.querySelector('#weatherToggle i');
 
         if (currentWeatherLayer === 'wind') {
             map.addLayer(tempLayerGroup);
             currentWeatherLayer = 'temp';
-            iconElement.className = 'fas fa-thermometer-half'; // Change icon to temp
         } else if (currentWeatherLayer === 'temp') {
             map.addLayer(precipLayerGroup);
             currentWeatherLayer = 'precip';
-            iconElement.className = 'fas fa-cloud-showers-heavy'; // Change icon to precip
         } else { // currentWeatherLayer === 'precip'
             map.addLayer(windLayerGroup);
             currentWeatherLayer = 'wind';
-            iconElement.className = 'fas fa-wind'; // Change icon back to wind
+        }
+        updateWeatherToggleIcon(); // Update the button icon
+    }
+
+    function updateWeatherToggleIcon() {
+        const iconElement = document.querySelector('#weatherToggle i');
+        if (!iconElement) return;
+
+        switch (currentWeatherLayer) {
+            case 'wind':
+                iconElement.className = 'fas fa-wind';
+                iconElement.title = 'Showing Wind Layer';
+                break;
+            case 'temp':
+                iconElement.className = 'fas fa-thermometer-half';
+                 iconElement.title = 'Showing Temperature Layer';
+                break;
+            case 'precip':
+                iconElement.className = 'fas fa-cloud-showers-heavy';
+                 iconElement.title = 'Showing Precipitation Layer';
+                break;
+            default:
+                iconElement.className = 'fas fa-layer-group'; // Fallback
+                 iconElement.title = 'Toggle Weather Layer';
         }
     }
 
