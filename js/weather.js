@@ -9,7 +9,7 @@ function degreesToCompass(degrees) {
 
 async function analyzeRoute(points) {
   document.getElementById('statsContent').innerHTML = '<span class="loading-text">Analyzing route, fetching weather...</span>';
-  let weatherErrorCount = 0; // Track weather fetch errors
+  let weatherErrorCount = 0;
 
   try {
     const startTimeInput = document.getElementById('startTime').value;
@@ -17,8 +17,8 @@ async function analyzeRoute(points) {
     if (isNaN(startTime.getTime())) throw new Error("Invalid departure date/time selected.");
 
     const avgSpeedInput = document.getElementById('avgSpeed').value;
-    const avgSpeed = parseInt(avgSpeedInput);
-    if (isNaN(avgSpeed) || avgSpeed <= 0) throw new Error("Invalid average speed selected.");
+    const avgSpeed = parseInt(avgSpeedInput) || CONFIG.DEFAULTS.AVG_SPEED;
+    if (avgSpeed <= 0) throw new Error("Invalid average speed selected.");
 
     if (!trackLayer || typeof trackLayer.getDistance !== 'function') {
         const tempPolyline = L.polyline(points);
@@ -28,7 +28,7 @@ async function analyzeRoute(points) {
         trackLayer = tempPolyline; 
     }
 
-    const totalDistance = trackLayer.getDistance(); // meters
+    const totalDistance = trackLayer.getDistance();
     const totalDistanceKm = totalDistance / 1000;
     const estimatedDurationMs = (totalDistanceKm > 0 && avgSpeed > 0) ? (totalDistanceKm / avgSpeed) * 3600 * 1000 : 0;
     const estimatedEndTime = new Date(startTime.getTime() + estimatedDurationMs);
@@ -45,7 +45,7 @@ async function analyzeRoute(points) {
     document.getElementById('statsContent').innerHTML = statsHTML;
 
     const numPointsInput = document.getElementById('datapointsCount').value;
-    const numPoints = parseInt(numPointsInput) || 10;
+    const numPoints = parseInt(numPointsInput) || CONFIG.DEFAULTS.WEATHER_POINTS;
     const distancesToMark = [];
 
     if (numPoints >= 1 && totalDistance > 0) {
@@ -71,9 +71,9 @@ async function analyzeRoute(points) {
       const estTime = new Date(estTimeEpoch);
 
       try {
-        await new Promise(resolve => setTimeout(resolve, index * 60));
+        await new Promise(resolve => setTimeout(resolve, index * CONFIG.DEFAULTS.API_STAGGER_MS));
 
-        const forecastResponse = await fetch(`${OPENWEATHER_FORECAST_URL}?lat=${point.lat}&lon=${point.lng}&units=metric&appid=${OPENWEATHER_KEY}`);
+        const forecastResponse = await fetch(`${CONFIG.API_URLS.OPENWEATHER_FORECAST}?lat=${point.lat}&lon=${point.lng}&units=metric&appid=${CONFIG.API_KEYS.OPENWEATHER}`);
         if (!forecastResponse.ok) {
           const error = await forecastResponse.json().catch(() => ({ message: `HTTP ${forecastResponse.status}` }));
           throw new Error(`Forecast API: ${error.message || 'Unknown error'}`);
@@ -233,23 +233,23 @@ async function bestRandomRouteGenerator(triggeringButtonId) {
         center = map.getCenter();
     }
 
-    const routeLengthKm = parseInt(document.getElementById('routeLengthSlider').value);
+    const routeLengthKm = parseInt(document.getElementById('routeLengthSlider').value) || CONFIG.DEFAULTS.RANDOM_ROUTE_LENGTH;
     const routeLengthMeters = routeLengthKm * 1000;
     const startTimeInput = document.getElementById('startTime').value;
     const startTime = new Date(startTimeInput);
     if (isNaN(startTime.getTime())) throw new Error("Invalid departure date/time selected.");
     const avgSpeedInput = document.getElementById('avgSpeed').value;
-    const avgSpeed = parseInt(avgSpeedInput);
-    if (isNaN(avgSpeed) || avgSpeed <= 0) throw new Error("Invalid average speed selected.");
+    const avgSpeed = parseInt(avgSpeedInput) || CONFIG.DEFAULTS.AVG_SPEED;
+    if (avgSpeed <= 0) throw new Error("Invalid average speed selected.");
 
     clearRouteData();
 
-    const numCandidates = 3;
+    const numCandidates = CONFIG.DEFAULTS.RANDOM_ROUTE_CANDIDATES;
     document.getElementById('statsContent').innerHTML = `<span class="loading-text">Generating ${numCandidates} candidate routes (approx ${routeLengthKm} km)...</span>`;
 
     const candidatePromises = Array.from({ length: numCandidates }, (_, i) => (async () => {
        let seed = Math.floor(Math.random() * 100000);
-       let url = `${GRAPHHOPPER_URL}?vehicle=bike&points_encoded=false&algorithm=round_trip&point=${center.lat},${center.lng}&round_trip.distance=${routeLengthMeters}&round_trip.seed=${seed}&key=${GRAPHHOPPER_KEY}&elevation=true`;
+       let url = `${CONFIG.API_URLS.GRAPHHOPPER}?vehicle=bike&points_encoded=false&algorithm=round_trip&point=${center.lat},${center.lng}&round_trip.distance=${routeLengthMeters}&round_trip.seed=${seed}&key=${CONFIG.API_KEYS.GRAPHHOPPER}&elevation=true`;
        try {
          let response = await fetch(url);
          if (!response.ok) {
@@ -367,7 +367,7 @@ async function computeTailwindScore(routePoints, startTime, avgSpeed) {
   const totalDistance = computeTotalDistance(routePoints);
   if (totalDistance <= 0) return 0;
 
-  const sampleFractions = [0.25, 0.5, 0.75];
+  const sampleFractions = CONFIG.TAILWIND_SAMPLE_FRACTIONS;
   let totalTailwindComponent = 0;
   let validSamples = 0;
 
@@ -387,9 +387,9 @@ async function computeTailwindScore(routePoints, startTime, avgSpeed) {
     const sampleTimestamp = Math.floor(sampleTime.getTime() / 1000);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, index * 75));
+      await new Promise(resolve => setTimeout(resolve, index * CONFIG.DEFAULTS.TAILWIND_STAGGER_MS));
 
-      const forecastResponse = await fetch(`${OPENWEATHER_FORECAST_URL}?lat=${samplePoint.lat}&lon=${samplePoint.lng}&units=metric&appid=${OPENWEATHER_KEY}`);
+      const forecastResponse = await fetch(`${CONFIG.API_URLS.OPENWEATHER_FORECAST}?lat=${samplePoint.lat}&lon=${samplePoint.lng}&units=metric&appid=${CONFIG.API_KEYS.OPENWEATHER}`);
       if (!forecastResponse.ok) {
         console.warn(`Weather fetch failed for tailwind score at ${frac*100}% distance.`);
         return null;

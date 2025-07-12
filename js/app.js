@@ -1,3 +1,34 @@
+const CONFIG = {
+  API_KEYS: {
+     // WARNING: Keys exposed client-side. Secure via backend proxy in production.
+     GRAPHHOPPER: '594dca35-3715-43ea-ac3b-fd23dc58808a',
+     OPENWEATHER: '154dc010adbb10c0549d6d077e64b073'
+  },
+  API_URLS: {
+     GRAPHHOPPER: 'https://graphhopper.com/api/1/route',
+     OPENWEATHER_FORECAST: 'https://api.openweathermap.org/data/2.5/forecast',
+     NOMINATIM_SEARCH: 'https://nominatim.openstreetmap.org/search'
+  },
+  DEFAULTS: {
+      AVG_SPEED: 22,
+      WEATHER_POINTS: 10,
+      MAP_CENTER: [51.8426, 5.8528], // Nijmegen
+      MAP_ZOOM_DESKTOP: 13,
+      MAP_ZOOM_MOBILE: 12,
+      RANDOM_ROUTE_LENGTH: 50,
+      RANDOM_ROUTE_CANDIDATES: 3,
+      AUTOCOMPLETE_THRESHOLD: 3,
+      AUTOCOMPLETE_DEBOUNCE: 300,
+      API_STAGGER_MS: 60, // Delay between weather API calls in analyzeRoute
+      TAILWIND_STAGGER_MS: 75 // Delay between weather API calls in computeTailwindScore
+  },
+  TAILWIND_SAMPLE_FRACTIONS: [0.25, 0.5, 0.75],
+  AUTOCOMPLETE_TYPES: {
+      SHORT_QUERY: 'city,town,village',
+      LONG_QUERY: 'city,town,village,locality,road'
+  }
+};
+
 /* -------------------------
  * Global Variables & Initialization
  * ------------------------- */
@@ -15,20 +46,22 @@ let helpButton, helpPopup, closeHelpPopup, popupOverlay;
 /* -------------------------
  * API Keys & Endpoints (IMPORTANT: Hide these in production!)
  * ------------------------- */
-// WARNING: These keys are exposed client-side. For a real application,
-// use a backend proxy to protect them.
-const GRAPHHOPPER_KEY = '594dca35-3715-43ea-ac3b-fd23dc58808a'; // Replace with your key or proxy endpoint
-const OPENWEATHER_KEY = '154dc010adbb10c0549d6d077e64b073'; // Replace with your key or proxy endpoint
-const GRAPHHOPPER_URL = 'https://graphhopper.com/api/1/route';
-const OPENWEATHER_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast';
-const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
+// REMOVED OLD CONSTANTS - Now using CONFIG object above
+// const GRAPHHOPPER_KEY = '594dca35-3715-43ea-ac3b-fd23dc58808a';
+// const OPENWEATHER_KEY = '154dc010adbb10c0549d6d077e64b073';
+// const GRAPHHOPPER_URL = 'https://graphhopper.com/api/1/route';
+// const OPENWEATHER_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast';
+// const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 
 /* -------------------------
  * Map Initialization
  * ------------------------- */
 function initMap() {
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-  map = L.map('map', { zoomControl: false }).setView([51.8426, 5.8528], isMobile ? 12 : 13); // Centered on Nijmegen
+  map = L.map('map', { zoomControl: false }).setView(
+      CONFIG.DEFAULTS.MAP_CENTER,
+      isMobile ? CONFIG.DEFAULTS.MAP_ZOOM_MOBILE : CONFIG.DEFAULTS.MAP_ZOOM_DESKTOP
+  );
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
@@ -44,7 +77,7 @@ function initMap() {
   ['startLocation', 'endLocation', 'randomLocation'].forEach(id => {
     const input = document.getElementById(id);
     if (input) {
-      input.addEventListener('input', debounce(e => handleAutocomplete(e.target.value, input), 300));
+      input.addEventListener('input', debounce(e => handleAutocomplete(e.target.value, input), CONFIG.DEFAULTS.AUTOCOMPLETE_DEBOUNCE));
       input.addEventListener('focusout', e => {
         // Use timeout to allow clicking on autocomplete items
         setTimeout(() => {
@@ -263,7 +296,7 @@ async function handleAutocomplete(query, inputField) {
   const parentGroup = inputField.parentNode;
   const existingList = parentGroup.querySelector('.autocomplete-items');
   if (existingList) existingList.remove();
-  if (query.length < 3) return;
+  if (query.length < CONFIG.DEFAULTS.AUTOCOMPLETE_THRESHOLD) return;
 
   const loading = document.createElement('div');
   loading.className = 'autocomplete-items';
@@ -271,18 +304,17 @@ async function handleAutocomplete(query, inputField) {
   parentGroup.appendChild(loading);
 
   try {
-    let typeParam = query.length < 6 ? 'city,town,village' : 'city,town,village,locality,road';
+    let typeParam = query.length < 6 ? CONFIG.AUTOCOMPLETE_TYPES.SHORT_QUERY : CONFIG.AUTOCOMPLETE_TYPES.LONG_QUERY;
     const bounds = map.getBounds();
     const viewbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
-    // **MODIFIED**: Removed '&countrycodes=nl' to allow global search, still prioritizing viewbox.
-    const url = `${NOMINATIM_SEARCH_URL}?format=json&limit=5&q=${encodeURIComponent(query)}&addressdetails=1&accept-language=en&dedupe=1&polygon_text=0&type=${typeParam}&viewbox=${viewbox}`;
+    const url = `${CONFIG.API_URLS.NOMINATIM_SEARCH}?format=json&limit=5&q=${encodeURIComponent(query)}&addressdetails=1&accept-language=en&dedupe=1&polygon_text=0&type=${typeParam}&viewbox=${viewbox}`;
 
     const response = await fetch(url);
     const data = await response.json();
     loading.remove(); // Remove loading indicator
 
     // Double check if input field is still focused and has text
-    if (document.activeElement !== inputField || inputField.value.length < 3) return;
+    if (document.activeElement !== inputField || inputField.value.length < CONFIG.DEFAULTS.AUTOCOMPLETE_THRESHOLD) return;
 
     // Remove any list created while waiting for fetch
     const currentList = parentGroup.querySelector('.autocomplete-items');

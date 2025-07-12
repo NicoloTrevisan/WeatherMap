@@ -168,16 +168,15 @@ async function recalcRoute() {
 }
 
 async function calculateCyclingRoute(coordsArray) {
-    // Construct the GraphHopper API request URL
     const params = new URLSearchParams({
-        vehicle: 'bike',        // Use cycling profile
-        elevation: 'true',      // Request elevation data
-        points_encoded: 'false',// Request standard GeoJSON coordinates
-        key: GRAPHHOPPER_KEY    // Your API key
+        vehicle: 'bike',
+        elevation: 'true',
+        points_encoded: 'false',
+        key: CONFIG.API_KEYS.GRAPHHOPPER // Use config
     });
-    let url = `${GRAPHHOPPER_URL}?`;
+    let url = `${CONFIG.API_URLS.GRAPHHOPPER}?`; // Use config
     coordsArray.forEach(coord => {
-        url += `point=${coord.lat},${coord.lng}&`; // Add each waypoint
+        url += `point=${coord.lat},${coord.lng}&`;
     });
     url += params.toString();
 
@@ -197,7 +196,7 @@ async function calculateCyclingRoute(coordsArray) {
 }
 
 async function geocodeLocation(query) {
-    const url = `${NOMINATIM_SEARCH_URL}?format=json&limit=1&q=${encodeURIComponent(query)}&accept-language=en`;
+    const url = `${CONFIG.API_URLS.NOMINATIM_SEARCH}?format=json&limit=1&q=${encodeURIComponent(query)}&accept-language=en`; // Use config
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`Geocoding failed for "${query}" (Network error: ${response.status})`);
@@ -346,32 +345,21 @@ function removeWaypoint(markerToRemove) {
 function clearMap(triggeringButtonId) {
    showLoading(triggeringButtonId, "Clearing...");
    try {
-      clearRouteData(); // Clear map layers, markers, waypoints, stats
-
-      // Clear input fields
+      clearRouteData();
       document.getElementById('startLocation').value = '';
       document.getElementById('endLocation').value = '';
       document.getElementById('randomLocation').value = '';
-      document.getElementById('gpxFile').value = ""; // Reset file input
+      document.getElementById('gpxFile').value = "";
       document.getElementById('fileName').textContent = "No file selected";
-
-      // Reset settings to defaults
-      document.getElementById('avgSpeed').value = '22';
-      document.getElementById('datapointsCount').value = '10';
-      document.getElementById('routeLengthSlider').value = '50';
-      document.getElementById('routeLengthValue').textContent = '50 km';
-      document.getElementById('startTime').value = new Date().toISOString().slice(0, 16); // Reset time to now
-
-      // Clear any visible autocomplete lists
+      // Use config for defaults
+      document.getElementById('avgSpeed').value = CONFIG.DEFAULTS.AVG_SPEED;
+      document.getElementById('datapointsCount').value = CONFIG.DEFAULTS.WEATHER_POINTS;
+      document.getElementById('routeLengthSlider').value = CONFIG.DEFAULTS.RANDOM_ROUTE_LENGTH;
+      document.getElementById('routeLengthValue').textContent = `${CONFIG.DEFAULTS.RANDOM_ROUTE_LENGTH} km`;
+      document.getElementById('startTime').value = new Date().toISOString().slice(0, 16);
       document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
-
-      // Reset recommended heading marker if implemented
-      // if (window.recommendedMarker) map.removeLayer(window.recommendedMarker); window.recommendedMarker = null;
-
-      // Reset stats content to the initial message
-       document.getElementById('statsContent').innerHTML = 'No route loaded. Use the options above or load a GPX file.';
-       document.getElementById('errorDisplay').innerHTML = ''; // Also clear any previous error messages
-
+      document.getElementById('statsContent').innerHTML = 'No route loaded. Use the options above or load a GPX file.';
+      document.getElementById('errorDisplay').innerHTML = '';
       console.log("Map cleared.");
    } catch(e) {
       showError("Error clearing map: " + e.message);
