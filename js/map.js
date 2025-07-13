@@ -351,6 +351,12 @@ function clearMap(triggeringButtonId) {
       document.getElementById('randomLocation').value = '';
       document.getElementById('gpxFile').value = "";
       document.getElementById('fileName').textContent = "No file selected";
+      
+      // Clear activity analysis inputs
+      document.getElementById('activityGpxFile').value = "";
+      document.getElementById('activityFileName').textContent = "No file selected";
+      document.getElementById('analyzeActivityButton').disabled = true;
+      
       // Use config for defaults
       document.getElementById('avgSpeed').value = CONFIG.DEFAULTS.AVG_SPEED;
       document.getElementById('datapointsCount').value = CONFIG.DEFAULTS.WEATHER_POINTS;
@@ -375,10 +381,28 @@ function clearRouteData() {
        map.removeLayer(trackLayer);
        trackLayer = null;
    }
-   // Clear weather layers
+   
+   // Clear weather layers (used by both planning and analysis)
    windLayerGroup.clearLayers();
    tempLayerGroup.clearLayers();
    precipLayerGroup.clearLayers();
+   
+   // Remove weather layers from map if they're currently displayed
+   if (map.hasLayer(windLayerGroup)) map.removeLayer(windLayerGroup);
+   if (map.hasLayer(tempLayerGroup)) map.removeLayer(tempLayerGroup);
+   if (map.hasLayer(precipLayerGroup)) map.removeLayer(precipLayerGroup);
+   
+   // Clear historical weather markers (for activity analysis)
+   if (typeof historicalWeatherMarkers !== 'undefined') {
+     historicalWeatherMarkers.clearLayers();
+     if (map.hasLayer(historicalWeatherMarkers)) map.removeLayer(historicalWeatherMarkers);
+   }
+
+   // Clear activity special markers (for activity analysis)
+   if (typeof activitySpecialMarkers !== 'undefined') {
+     activitySpecialMarkers.clearLayers();
+     if (map.hasLayer(activitySpecialMarkers)) map.removeLayer(activitySpecialMarkers);
+   }
 
    // Remove waypoint markers (start, end, intermediate)
    waypoints.forEach(marker => map.removeLayer(marker));
@@ -398,6 +422,25 @@ function clearRouteData() {
            }
        }
    });
+
+   // Clear activity data (for activity analysis)
+   if (typeof activityData !== 'undefined') {
+     activityData = null;
+   }
+   if (typeof elevationProfile !== 'undefined') {
+     elevationProfile = [];
+   }
+
+   // Clear elevation profile display
+   const elevationProfileContainer = document.getElementById('elevationProfile');
+   if (elevationProfileContainer) {
+     elevationProfileContainer.style.display = 'none';
+     elevationProfileContainer.innerHTML = '';
+   }
+
+   // Reset weather layer state
+   currentWeatherLayer = 'wind';
+   updateWeatherToggleIcon();
 
    // Clear stats and error display areas
    document.getElementById('statsContent').innerHTML = '';

@@ -44,6 +44,9 @@ async function analyzeRoute(points) {
     `;
     document.getElementById('statsContent').innerHTML = statsHTML;
 
+    // Create elevation profile for planned routes
+    createElevationProfile(points, false);
+
     const numPointsInput = document.getElementById('datapointsCount').value;
     const numPoints = parseInt(numPointsInput) || CONFIG.DEFAULTS.WEATHER_POINTS;
     const distancesToMark = [];
@@ -445,4 +448,112 @@ function displayRecommendedHeading() {
        map.removeLayer(window.recommendedMarker);
        window.recommendedMarker = null;
    }
+}
+
+/* -------------------------
+ * Elevation Profile Creation
+ * ------------------------- */
+function createElevationProfile(points, isAnalysis = false) {
+  const profileContainer = document.getElementById('elevationProfile');
+  if (!profileContainer) return;
+
+  // Check if we have elevation data
+  let elevationData = [];
+  let cumulativeDistance = 0;
+  let hasElevation = false;
+
+  for (let i = 0; i < points.length; i++) {
+    if (i > 0) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const segmentDistance = calculateDistanceForProfile(prev.lat, prev.lng, curr.lat, curr.lng);
+      cumulativeDistance += segmentDistance / 1000; // Convert to km
+    }
+
+    // For planned routes, we need to extract elevation from the point if available
+    let elevation = null;
+    if (isAnalysis) {
+      elevation = points[i].ele;
+    } else {
+      // For planned routes, elevation might be in different format
+      elevation = points[i].alt || points[i].elevation || null;
+    }
+
+    if (elevation !== null && !isNaN(elevation)) {
+      hasElevation = true;
+      elevationData.push({
+        distance: cumulativeDistance,
+        elevation: elevation
+      });
+    }
+  }
+
+  if (!hasElevation || elevationData.length < 2) {
+    profileContainer.style.display = 'none';
+    return;
+  }
+
+  // Show and populate the elevation profile
+  profileContainer.style.display = 'block';
+  
+  const minElevation = Math.min(...elevationData.map(d => d.elevation));
+  const maxElevation = Math.max(...elevationData.map(d => d.elevation));
+  const totalDistance = elevationData[elevationData.length - 1].distance;
+  
+  const elevationRange = maxElevation - minElevation;
+  const padding = elevationRange * 0.1; // 10% padding
+  const chartMin = minElevation - padding;
+  const chartMax = maxElevation + padding;
+  const chartRange = chartMax - chartMin;
+
+  // Create SVG path
+  const chartWidth = 260; // Fixed width for sidebar
+  const chartHeight = 100;
+  
+  let pathData = '';
+  let areaData = '';
+  
+  elevationData.forEach((point, index) => {
+    const x = (point.distance / totalDistance) * chartWidth;
+    const y = chartHeight - ((point.elevation - chartMin) / chartRange) * chartHeight;
+    
+    if (index === 0) {
+      pathData += `M ${x} ${y}`;
+      areaData += `M ${x} ${chartHeight} L ${x} ${y}`;
+    } else {
+      pathData += ` L ${x} ${y}`;
+      areaData += ` L ${x} ${y}`;
+    }
+  });
+  
+  // Close the area path
+  areaData += ` L ${chartWidth} ${chartHeight} Z`;
+
+  const analysisClass = isAnalysis ? 'elevation-analyzed' : '';
+  
+  profileContainer.innerHTML = `
+    <h4><i class="fas fa-chart-area"></i> Elevation Profile</h4>
+    <div class="elevation-chart ${analysisClass}">
+      <svg width="100%" height="100%" viewBox="0 0 ${chartWidth} ${chartHeight}">
+        <path class="elevation-area" d="${areaData}"></path>
+        <path class="elevation-line" d="${pathData}"></path>
+      </svg>
+    </div>
+    <div class="elevation-labels">
+      <span>0 km</span>
+      <span>${minElevation.toFixed(0)}m - ${maxElevation.toFixed(0)}m</span>
+      <span>${totalDistance.toFixed(1)} km</span>
+    </div>
+  `;
+}
+
+function calculateDistanceForProfile(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }

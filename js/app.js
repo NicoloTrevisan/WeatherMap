@@ -7,7 +7,8 @@ const CONFIG = {
   API_URLS: {
      GRAPHHOPPER: 'https://graphhopper.com/api/1/route',
      OPENWEATHER_FORECAST: 'https://api.openweathermap.org/data/2.5/forecast',
-     NOMINATIM_SEARCH: 'https://nominatim.openstreetmap.org/search'
+     NOMINATIM_SEARCH: 'https://nominatim.openstreetmap.org/search',
+     OPENMETEO_HISTORICAL: 'https://archive-api.open-meteo.com/v1/archive'
   },
   DEFAULTS: {
       AVG_SPEED: 22,
@@ -111,7 +112,7 @@ function initMap() {
   window.addEventListener('resize', handleResize);
 
   // Show default tab
-  showTab('generateRoute', document.getElementById('tabGenerateRouteBtn'));
+  showTab('plan', document.getElementById('tabPlanBtn'));
 
   // Global click listener for autocomplete (alternative closing mechanism)
   document.addEventListener('click', function(event) {
@@ -123,9 +124,21 @@ function initMap() {
   });
 
   // Store original button states
-  ['generateRouteButton', 'generateRandomButton', 'loadGpxButton', 'saveGpxButton', 'clearMapButton'].forEach(id => {
+  ['generateRouteButton', 'generateRandomButton', 'loadGpxButton', 'saveGpxButton', 'clearMapButton', 'loadActivityButton', 'analyzeActivityButton'].forEach(id => {
      const btn = document.getElementById(id);
      if (btn) activeButtons[id] = btn.innerHTML;
+  });
+
+  // Activity GPX file handling
+  document.getElementById('activityGpxFile').addEventListener('change', function(e) {
+    const analyzeBtn = document.getElementById('analyzeActivityButton');
+    if (e.target.files.length > 0) {
+       document.getElementById('activityFileName').textContent = e.target.files[0].name;
+       analyzeBtn.disabled = false;
+    } else {
+       document.getElementById('activityFileName').textContent = "No file selected";
+       analyzeBtn.disabled = true;
+    }
   });
 
   // --- Initialize Help Popup ---
@@ -173,6 +186,10 @@ function hideLoading() {
         // Check if original content exists before restoring
         if (activeButtons[id]) {
             btn.innerHTML = activeButtons[id];
+        }
+        // Special case: keep analyze button disabled if no file is selected
+        if (id === 'analyzeActivityButton' && !document.getElementById('activityGpxFile').files.length) {
+            btn.disabled = true;
         }
      }
   });
@@ -277,7 +294,31 @@ function showTab(tabId, buttonElement) {
   if (buttonElement) {
      buttonElement.classList.add('active');
   }
+  
+  // Update stats title based on active tab
+  const statsTitle = document.getElementById('statsTitle');
+  if (tabId === 'analyze') {
+    statsTitle.textContent = 'Activity Analysis';
+  } else {
+    statsTitle.textContent = 'Statistics & Weather';
+  }
+  
   // Clear any lingering autocomplete lists when switching tabs
+  document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
+}
+
+function showSubTab(subTabId, buttonElement) {
+  const contents = document.getElementsByClassName('sub-tab-content');
+  for (let i = 0; i < contents.length; i++) {
+    contents[i].style.display = 'none';
+  }
+  document.getElementById(subTabId).style.display = 'block';
+  const buttons = document.querySelectorAll('.sub-tabs button');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  if (buttonElement) {
+     buttonElement.classList.add('active');
+  }
+  // Clear any lingering autocomplete lists when switching sub-tabs
   document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
 }
 

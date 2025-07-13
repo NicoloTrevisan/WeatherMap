@@ -11,53 +11,112 @@
 <body>
   <div id="container">
     <div class="controls" id="controls">
-      <h2>Cycling Route Planner</h2>
+      <h2>Cycling Data Analysis and Planning</h2>
+      
+      <div class="guide-button-container">
+        <button id="helpButton" class="guide-button">
+          <i class="fas fa-compass"></i> Guide
+        </button>
+      </div>
+      
       <div class="section" id="datetime-section">
         <label for="startTime">Departure Date & Time:</label>
         <input type="datetime-local" id="startTime" required>
       </div>
       <div class="tabs">
-        <button type="button" id="tabGenerateRouteBtn" class="active" onclick="showTab('generateRoute', this)">Generate</button>
-        <button type="button" id="tabRandomRouteBtn" onclick="showTab('generateRandom', this)">Random</button>
+        <button type="button" id="tabPlanBtn" class="active" onclick="showTab('plan', this)">Plan</button>
+        <button type="button" id="tabAnalyzeBtn" onclick="showTab('analyze', this)">Analyze</button>
         <button type="button" id="tabSettingsBtn" onclick="showTab('settings', this)">Settings</button>
       </div>
-      <div class="tab-content" id="generateRoute" style="display:block;">
+      
+      <!-- PLAN TAB - Route Planning -->
+      <div class="tab-content" id="plan" style="display:block;">
+        <div class="sub-tabs">
+          <button type="button" id="subTabGenerateBtn" class="active" onclick="showSubTab('generateRoute', this)">Generate</button>
+          <button type="button" id="subTabRandomBtn" onclick="showSubTab('generateRandom', this)">Random</button>
+        </div>
+        
+        <div class="sub-tab-content" id="generateRoute" style="display:block;">
+          <div class="section">
+            <h3>Generate Route</h3>
+            <div class="input-group">
+               <label for="startLocation">Start Address:</label>
+              <input type="text" id="startLocation" placeholder="Enter start address" autocomplete="off">
+            </div>
+            <div class="input-group">
+               <label for="endLocation">End Address:</label>
+              <input type="text" id="endLocation" placeholder="Enter end address" autocomplete="off">
+            </div>
+            <div class="input-group">
+              <button id="generateRouteButton" onclick="processInput(this.id)">
+                  <i class="fas fa-route"></i> Generate Route
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="sub-tab-content" id="generateRandom" style="display:none;">
+          <div class="section">
+            <h3>Generate Random Route</h3>
+            <div class="input-group">
+               <label for="randomLocation">Start Location (Optional):</label>
+              <input type="text" id="randomLocation" placeholder="Uses map center if blank" autocomplete="off">
+            </div>
+            <div class="input-group">
+              <label for="routeLengthSlider">Desired Length: <span id="routeLengthValue">50 km</span></label>
+              <input type="range" id="routeLengthSlider" min="20" max="200" value="50" step="5">
+              <div class="range-labels" style="font-size: 0.8em; color: #6c757d; display: flex; justify-content: space-between;"><span>20 km</span><span>200 km</span></div>
+            </div>
+            <div class="input-group">
+              <button id="generateRandomButton" onclick="bestRandomRouteGenerator(this.id)">
+                  <i class="fas fa-random"></i> Generate Best Random Route
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- LEGACY GPX SECTION - Only for Planning -->
+        <div class="section" id="legacy-gpx-section">
+          <h3>GPX File (Planning)</h3>
+          <div class="input-group">
+            <input type="file" id="gpxFile" accept=".gpx" hidden>
+            <button id="loadGpxButton" onclick="document.getElementById('gpxFile').click()">
+              <i class="fas fa-file-upload"></i> Load GPX for Planning
+            </button>
+            <span id="fileName">No file selected</span>
+          </div>
+        </div>
+        
         <div class="section">
-          <h3>Generate Route</h3>
+          <h3>Save Route</h3>
           <div class="input-group">
-             <label for="startLocation">Start Address:</label>
-            <input type="text" id="startLocation" placeholder="Enter start address" autocomplete="off">
+             <button id="saveGpxButton" onclick="saveRouteAsGPX()">
+             <i class="fas fa-save"></i> Save Route as GPX
+             </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ANALYZE TAB - Activity Analysis -->
+      <div class="tab-content" id="analyze" style="display:none;">
+        <div class="section">
+          <h3>Upload Activity</h3>
+          <div class="input-group">
+            <input type="file" id="activityGpxFile" accept=".gpx" hidden>
+            <button id="loadActivityButton" onclick="document.getElementById('activityGpxFile').click()">
+              <i class="fas fa-file-upload"></i> Load Activity GPX
+            </button>
+            <span id="activityFileName">No file selected</span>
           </div>
           <div class="input-group">
-             <label for="endLocation">End Address:</label>
-            <input type="text" id="endLocation" placeholder="Enter end address" autocomplete="off">
-          </div>
-          <div class="input-group">
-            <button id="generateRouteButton" onclick="processInput(this.id)">
-                <i class="fas fa-route"></i> Generate Route
+            <button id="analyzeActivityButton" onclick="analyzeActivity(this.id)" disabled>
+              <i class="fas fa-chart-line"></i> Analyze Activity
             </button>
           </div>
         </div>
       </div>
-      <div class="tab-content" id="generateRandom" style="display:none;">
-        <div class="section">
-          <h3>Generate Random Route</h3>
-          <div class="input-group">
-             <label for="randomLocation">Start Location (Optional):</label>
-            <input type="text" id="randomLocation" placeholder="Uses map center if blank" autocomplete="off">
-          </div>
-          <div class="input-group">
-            <label for="routeLengthSlider">Desired Length: <span id="routeLengthValue">50 km</span></label>
-            <input type="range" id="routeLengthSlider" min="20" max="200" value="50" step="5">
-            <div class="range-labels" style="font-size: 0.8em; color: #6c757d; display: flex; justify-content: space-between;"><span>20 km</span><span>200 km</span></div>
-          </div>
-          <div class="input-group">
-            <button id="generateRandomButton" onclick="bestRandomRouteGenerator(this.id)">
-                <i class="fas fa-random"></i> Generate Best Random Route
-            </button>
-          </div>
-        </div>
-      </div>
+      
+      <!-- SETTINGS TAB -->
       <div class="tab-content" id="settings" style="display:none;">
         <div class="section">
           <h3>Settings</h3>
@@ -77,21 +136,6 @@
           </div>
         </div>
       </div>
-      <div class="section">
-        <h3>GPX File</h3>
-        <div class="input-group">
-          <input type="file" id="gpxFile" accept=".gpx" hidden>
-          <button id="loadGpxButton" onclick="document.getElementById('gpxFile').click()">
-            <i class="fas fa-file-upload"></i> Load GPX File
-          </button>
-          <span id="fileName">No file selected</span>
-        </div>
-         <div class="input-group">
-           <button id="saveGpxButton" onclick="saveRouteAsGPX()">
-           <i class="fas fa-save"></i> Save Route as GPX
-           </button>
-        </div>
-      </div>
 
       <div class="section">
         <h3>Actions</h3>
@@ -101,13 +145,16 @@
           </button>
         </div>
       </div>
+      
       <div class="section">
-        <h3>Statistics & Weather</h3>
+        <h3 id="statsTitle">Statistics & Weather</h3>
         <div class="stats-box" id="stats">
           <div id="errorDisplay" class="error-message"></div>
           <div id="statsContent">No route loaded. Use the options above or load a GPX file.</div>
+          <div id="elevationProfile" class="elevation-profile"></div>
           </div>
       </div>
+      
       <div class="section">
         <p style="font-size: 13px; color: #6c757d; line-height: 1.5;">
            <i class="fas fa-info-circle"></i> <strong>Map Interaction:</strong><br>
@@ -124,40 +171,58 @@
   <div id="weatherToggle" onclick="toggleWeatherLayer()" title="Toggle Weather Layer (Wind/Temp/Precip)">
     <i class="fas fa-wind"></i> </div>
 
-  <div id="helpButton" title="Show Help Guide">
-      <i class="fas fa-question"></i>
-  </div>
-
   <div id="popupOverlay" class="hidden"></div>
   <div id="helpPopup" class="popup hidden">
-      <h3><i class="fas fa-info-circle"></i> How to Use the Planner</h3>
-      <p>Welcome! Here's a quick guide:</p>
+      <h3><i class="fas fa-compass"></i> Complete Guide</h3>
+      <p>Welcome to your comprehensive cycling companion! Here's everything you need to know:</p>
+      
+      <h4><i class="fas fa-route"></i> Route Planning</h4>
       <ul>
-          <li><strong>Generate Route:</strong> Enter start and end addresses in the 'Generate' tab and click the button. Autocomplete suggestions will appear as you type.</li>
-          <li><strong>Random Route:</strong> Go to the 'Random' tab, optionally enter a starting point (or leave blank to use the map center), select a desired route length, and click 'Generate Best Random Route'. The app generates a few options and picks the one with the best predicted tailwind.</li>
-          <li><strong>Load GPX:</strong> Click 'Load GPX File', select your file. The route will be displayed.</li>
-          <li><strong>Save GPX:</strong> After generating or loading a route, click 'Save Route as GPX'.</li>
-          <li><strong>Waypoints:</strong>
+          <li><strong>Generate Route:</strong> Enter start and end addresses in the 'Plan' → 'Generate' tab. Autocomplete suggestions appear as you type.</li>
+          <li><strong>Random Route:</strong> Go to 'Plan' → 'Random' tab, optionally enter a starting point (or leave blank to use map center), select desired route length, and click 'Generate Best Random Route'. The app generates multiple options and picks the one with the best predicted tailwind.</li>
+          <li><strong>Load GPX for Planning:</strong> In the 'Plan' tab, click 'Load GPX for Planning' to upload a route file for future rides with weather forecasts.</li>
+          <li><strong>Save Route:</strong> After generating or loading a route, click 'Save Route as GPX' to download the route file.</li>
+      </ul>
+      
+      <h4><i class="fas fa-chart-line"></i> Activity Analysis</h4>
+      <ul>
+          <li><strong>Upload Activity:</strong> In the 'Analyze' tab, click 'Load Activity GPX' to upload a completed ride.</li>
+          <li><strong>Comprehensive Metrics:</strong> View distance, moving time, average/max speed, elevation gain/loss, and elevation range.</li>
+          <li><strong>Historical Weather:</strong> See actual weather conditions during your ride with temperature, wind, and precipitation data.</li>
+          <li><strong>Tailwind Analysis:</strong> Discover if wind helped or hindered your ride with the tailwind score.</li>
+          <li><strong>Special Markers:</strong> Find your highest elevation point and fastest speed segment marked on the map.</li>
+      </ul>
+      
+      <h4><i class="fas fa-map-marked-alt"></i> Map Features</h4>
+      <ul>
+          <li><strong>Waypoints (Planning only):</strong>
               <ul>
-                  <li>After generating a route (not GPX or random), you can add intermediate waypoints.</li>
-                  <li><strong>Add:</strong> Right-click (or long-press on touch devices) anywhere on the map.</li>
+                  <li><strong>Add:</strong> Right-click (or long-press on touch devices) anywhere on the map after generating a route.</li>
                   <li><strong>Move:</strong> Drag any marker (start, end, or intermediate blue markers).</li>
                   <li><strong>Remove:</strong> Right-click (or long-press) on a blue intermediate waypoint marker.</li>
               </ul>
           </li>
-           <li><strong>Departure Time:</strong> Set your planned departure date and time at the top. This is crucial for accurate weather forecasts along the route.</li>
-          <li><strong>Settings:</strong> Adjust your average cycling speed and the number of weather points displayed on the map under the 'Settings' tab.</li>
-          <li><strong>Weather Info:</strong>
-              <ul>
-                  <li>Weather icons appear along the route based on your departure time and average speed.</li>
-                  <li>Click the <i class="fas fa-wind"></i> / <i class="fas fa-thermometer-half"></i> / <i class="fas fa-cloud-showers-heavy"></i> icon (bottom-right on desktop, top-left on mobile) to cycle between Wind, Temperature, and Precipitation views.</li>
-                  <li>Hover over (or tap) a weather icon on the map for detailed forecast info at that point.</li>
-                  <li>The <strong>Tailwind Score</strong> in the stats box estimates the average headwind (-) or tailwind (+) component in km/h.</li>
-              </ul>
-          </li>
-          <li><strong>Clear:</strong> Use the 'Clear Map & Inputs' button to reset everything.</li>
-          <li><strong>Menu:</strong> Use the 'Hide/Show Menu' button to toggle the control panel visibility.</li>
+          <li><strong>Elevation Profile:</strong> View elevation changes along your route or activity.</li>
+          <li><strong>Route Colors:</strong> Blue solid lines for planned routes, green dashed lines for analyzed activities.</li>
       </ul>
+      
+      <h4><i class="fas fa-cloud-sun"></i> Weather Information</h4>
+      <ul>
+          <li><strong>Planning:</strong> Set departure date/time for accurate weather forecasts along your planned route.</li>
+          <li><strong>Analysis:</strong> View historical weather conditions during your actual ride.</li>
+          <li><strong>Weather Layers:</strong> Click the weather icon (bottom-right on desktop, top-left on mobile) to cycle between Wind, Temperature, and Precipitation views.</li>
+          <li><strong>Detailed Info:</strong> Hover over (or tap) weather icons for detailed forecast information.</li>
+          <li><strong>Tailwind Score:</strong> Positive values indicate helpful tailwind, negative values indicate hindering headwind.</li>
+      </ul>
+      
+      <h4><i class="fas fa-cog"></i> Settings & Controls</h4>
+      <ul>
+          <li><strong>Average Speed:</strong> Adjust your cycling speed in the 'Settings' tab for accurate time estimates.</li>
+          <li><strong>Weather Points:</strong> Control the number of weather markers displayed on the map.</li>
+          <li><strong>Clear Map:</strong> Reset everything to start fresh.</li>
+          <li><strong>Menu Toggle:</strong> Use 'Hide/Show Menu' to toggle the control panel visibility.</li>
+      </ul>
+      
       <button id="closeHelpPopup">Got it!</button>
   </div>
 
@@ -166,5 +231,6 @@
   <script src="js/app.js"></script>
   <script src="js/map.js"></script>
   <script src="js/weather.js"></script>
+  <script src="js/activity.js"></script>
 </body>
 </html>
