@@ -124,7 +124,11 @@ function initMap() {
   });
 
   // Store original button states
-  ['generateRouteButton', 'generateRandomButton', 'loadGpxButton', 'saveGpxButton', 'clearMapButton', 'loadActivityButton', 'analyzeActivityButton'].forEach(id => {
+  [
+    'generateRouteButton', 'generateRandomButton', 'loadGpxButton', 
+    'saveGpxButton', 'clearMapButton', 'loadActivityButton', 
+    'analyzeActivityButton', 'planDemoButton', 'analyzeDemoButton'
+  ].forEach(id => {
      const btn = document.getElementById(id);
      if (btn) activeButtons[id] = btn.innerHTML;
   });
@@ -157,6 +161,144 @@ function initMap() {
 
   // Initial resize handler call
   handleResize();
+
+  // Initialize welcome modal
+  initWelcomeModal();
+  
+  // Initialize settings
+  initSettings();
+}
+
+/* -------------------------
+ * Settings Management
+ * ------------------------- */
+function initSettings() {
+  // Animation toggle
+  const animationToggle = document.getElementById('showAnimations');
+  if (animationToggle) {
+    // Load saved setting
+    const savedAnimations = localStorage.getItem('showAnimations');
+    if (savedAnimations !== null) {
+      animationToggle.checked = savedAnimations === 'true';
+    }
+    
+    // Apply animation setting
+    updateAnimationSetting(animationToggle.checked);
+    
+    // Listen for changes
+    animationToggle.addEventListener('change', (e) => {
+      localStorage.setItem('showAnimations', e.target.checked);
+      updateAnimationSetting(e.target.checked);
+    });
+  }
+  
+  // Auto-hide menu toggle
+  const autoHideToggle = document.getElementById('autoHideMenu');
+  if (autoHideToggle) {
+    // Load saved setting
+    const savedAutoHide = localStorage.getItem('autoHideMenu');
+    if (savedAutoHide !== null) {
+      autoHideToggle.checked = savedAutoHide === 'true';
+    }
+    
+    // Listen for changes
+    autoHideToggle.addEventListener('change', (e) => {
+      localStorage.setItem('autoHideMenu', e.target.checked);
+    });
+  }
+}
+
+function updateAnimationSetting(enabled) {
+  const body = document.body;
+  if (enabled) {
+    body.classList.remove('no-animations');
+  } else {
+    body.classList.add('no-animations');
+  }
+}
+
+function shouldAutoHideMenu() {
+  const autoHideToggle = document.getElementById('autoHideMenu');
+  return autoHideToggle ? autoHideToggle.checked : true; // Default to true
+}
+
+/* -------------------------
+ * Welcome Modal Functions
+ * ------------------------- */
+function showWelcomeModal() {
+  const welcomeOverlay = document.getElementById('welcomeOverlay');
+  if (welcomeOverlay) {
+    welcomeOverlay.classList.remove('hidden');
+  }
+}
+
+function hideWelcomeModal() {
+  const welcomeOverlay = document.getElementById('welcomeOverlay');
+  if (welcomeOverlay) {
+    welcomeOverlay.classList.add('hidden');
+  }
+}
+
+function initWelcomeModal() {
+  const welcomeOverlay = document.getElementById('welcomeOverlay');
+  const startPlanningButton = document.getElementById('startPlanningButton');
+  const startAnalyzingButton = document.getElementById('startAnalyzingButton');
+  const skipWelcomeButton = document.getElementById('skipWelcomeButton');
+  const planDemoButton = document.getElementById('planDemoButton');
+  const analyzeDemoButton = document.getElementById('analyzeDemoButton');
+
+  // For demonstration, we always show the welcome modal.
+  if (welcomeOverlay) {
+    setTimeout(() => showWelcomeModal(), 500);
+  }
+
+  // New Demo Buttons
+  if (planDemoButton) {
+    planDemoButton.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent card click event
+      loadDemo('plan');
+    });
+  }
+  if (analyzeDemoButton) {
+    analyzeDemoButton.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent card click event
+      loadDemo('analyze');
+    });
+  }
+
+  // Start planning button
+  if (startPlanningButton) {
+    startPlanningButton.addEventListener('click', () => {
+      hideWelcomeModal();
+      showTab('plan', document.getElementById('tabPlanBtn'));
+      showSubTab('generateRoute', document.getElementById('subTabGenerateBtn'));
+      setTimeout(() => document.getElementById('startLocation').focus(), 300);
+    });
+  }
+
+  // Start analyzing button
+  if (startAnalyzingButton) {
+    startAnalyzingButton.addEventListener('click', () => {
+      hideWelcomeModal();
+      showTab('analyze', document.getElementById('tabAnalyzeBtn'));
+      setTimeout(() => {
+        const uploadSection = document.querySelector('#analyze .section');
+        if (uploadSection) {
+          uploadSection.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+          setTimeout(() => {
+            uploadSection.style.backgroundColor = '';
+          }, 2000);
+        }
+      }, 300);
+    });
+  }
+
+  // Skip button
+  if (skipWelcomeButton) {
+    skipWelcomeButton.addEventListener('click', () => {
+      hideWelcomeModal();
+    });
+  }
 }
 
 /* -------------------------
@@ -281,46 +423,8 @@ function toggleMenu() {
 }
 
 /* -------------------------
- * Tab Switching Functions
+ * Tab Switching Functions (Legacy - Enhanced versions below)
  * ------------------------- */
-function showTab(tabId, buttonElement) {
-  const contents = document.getElementsByClassName('tab-content');
-  for (let i = 0; i < contents.length; i++) {
-    contents[i].style.display = 'none';
-  }
-  document.getElementById(tabId).style.display = 'block';
-  const buttons = document.querySelectorAll('.tabs button');
-  buttons.forEach(btn => btn.classList.remove('active'));
-  if (buttonElement) {
-     buttonElement.classList.add('active');
-  }
-  
-  // Update stats title based on active tab
-  const statsTitle = document.getElementById('statsTitle');
-  if (tabId === 'analyze') {
-    statsTitle.textContent = 'Activity Analysis';
-  } else {
-    statsTitle.textContent = 'Statistics & Weather';
-  }
-  
-  // Clear any lingering autocomplete lists when switching tabs
-  document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
-}
-
-function showSubTab(subTabId, buttonElement) {
-  const contents = document.getElementsByClassName('sub-tab-content');
-  for (let i = 0; i < contents.length; i++) {
-    contents[i].style.display = 'none';
-  }
-  document.getElementById(subTabId).style.display = 'block';
-  const buttons = document.querySelectorAll('.sub-tabs button');
-  buttons.forEach(btn => btn.classList.remove('active'));
-  if (buttonElement) {
-     buttonElement.classList.add('active');
-  }
-  // Clear any lingering autocomplete lists when switching sub-tabs
-  document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
-}
 
 /* -------------------------
  * Autocomplete Function
@@ -458,6 +562,140 @@ function toggleHelpPopup() {
     } else {
         hideHelpPopup();
     }
+}
+
+/* -------------------------
+ * Demo Route Function
+ * ------------------------- */
+async function loadDemo(mode) {
+  const demoFile = 'Demo/From_Nijmegen_to_Maastricht.gpx';
+  const buttonId = mode === 'plan' ? 'planDemoButton' : 'analyzeDemoButton';
+  showLoading(buttonId, "Loading Demo...");
+  hideWelcomeModal();
+
+  try {
+    const response = await fetch(demoFile);
+    if (!response.ok) {
+      throw new Error(`Could not fetch demo file: ${response.statusText}`);
+    }
+    const gpxText = await response.text();
+    const file = new File([gpxText], "From_Nijmegen_to_Maastricht.gpx", { type: "application/gpx+xml" });
+
+    clearRouteData();
+
+    if (mode === 'plan') {
+      showTab('plan', document.getElementById('tabPlanBtn'));
+      const points = await parseGPX(file);
+      if (!points || points.length < 2) throw new Error("Demo GPX file contains insufficient points.");
+      
+      trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
+      map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+      
+      L.marker(points[0], { icon: startIcon, interactive: false }).addTo(map);
+      L.marker(points[points.length - 1], { icon: endIcon, interactive: false }).addTo(map);
+      waypoints = [];
+      
+      await analyzeRoute(points);
+      document.getElementById('fileName').textContent = file.name;
+
+    } else if (mode === 'analyze') {
+      showTab('analyze', document.getElementById('tabAnalyzeBtn'));
+      
+      // Simulate file input
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      const fileInput = document.getElementById('activityGpxFile');
+      fileInput.files = dataTransfer.files;
+      
+      // Manually trigger the change event logic
+      document.getElementById('activityFileName').textContent = file.name;
+      document.getElementById('analyzeActivityButton').disabled = false;
+      
+      // Automatically trigger analysis
+      await analyzeActivity('analyzeActivityButton');
+    }
+
+    if (window.innerWidth <= 600 && shouldAutoHideMenu()) {
+      hideMenu();
+    }
+
+  } catch (error) {
+    showError(`Demo route failed to load: ${error.message}`);
+    document.getElementById('statsContent').innerHTML = 'Demo route loading failed.';
+  } finally {
+    hideLoading();
+  }
+}
+
+/* -------------------------
+ * Enhanced Animation Functions
+ * ------------------------- */
+function animateStatsUpdate() {
+  const statsBox = document.getElementById('stats');
+  if (statsBox) {
+    statsBox.classList.add('updating');
+    setTimeout(() => {
+      statsBox.classList.remove('updating');
+      statsBox.classList.add('updated');
+      setTimeout(() => statsBox.classList.remove('updated'), 500);
+    }, 300);
+  }
+}
+
+/* -------------------------
+ * Enhanced Tab Functions with Animations
+ * ------------------------- */
+function showTab(tabId, buttonElement) {
+  const contents = document.getElementsByClassName('tab-content');
+  for (let i = 0; i < contents.length; i++) {
+    contents[i].style.display = 'none';
+  }
+  
+  const targetContent = document.getElementById(tabId);
+  if (targetContent) {
+    targetContent.style.display = 'block';
+    // Trigger reflow to ensure animation plays
+    targetContent.offsetHeight;
+  }
+  
+  const buttons = document.querySelectorAll('.tabs button');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  if (buttonElement) {
+     buttonElement.classList.add('active');
+  }
+  
+  // Update stats title based on active tab
+  const statsTitle = document.getElementById('statsTitle');
+  if (tabId === 'analyze') {
+    statsTitle.textContent = 'Activity Analysis';
+  } else {
+    statsTitle.textContent = 'Statistics & Weather';
+  }
+  
+  // Clear any lingering autocomplete lists when switching tabs
+  document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
+}
+
+function showSubTab(subTabId, buttonElement) {
+  const contents = document.getElementsByClassName('sub-tab-content');
+  for (let i = 0; i < contents.length; i++) {
+    contents[i].style.display = 'none';
+  }
+  
+  const targetContent = document.getElementById(subTabId);
+  if (targetContent) {
+    targetContent.style.display = 'block';
+    // Trigger reflow to ensure animation plays
+    targetContent.offsetHeight;
+  }
+  
+  const buttons = document.querySelectorAll('.sub-tabs button');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  if (buttonElement) {
+     buttonElement.classList.add('active');
+  }
+  // Clear any lingering autocomplete lists when switching sub-tabs
+  document.querySelectorAll('.autocomplete-items').forEach(el => el.remove());
 }
 
 // Initialize the map when the window loads

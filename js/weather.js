@@ -43,6 +43,11 @@ async function analyzeRoute(points) {
       <div id="tailwindScoreDisplay"></div>
     `;
     document.getElementById('statsContent').innerHTML = statsHTML;
+    
+    // Add stats animation
+    if (typeof animateStatsUpdate === 'function') {
+      animateStatsUpdate();
+    }
 
     // Create elevation profile for planned routes
     createElevationProfile(points, false);
@@ -311,7 +316,9 @@ async function bestRandomRouteGenerator(triggeringButtonId) {
 
     await analyzeRoute(bestCandidate.route);
 
-    if (window.innerWidth <= 600) { hideMenu(); }
+    if (window.innerWidth <= 600 && typeof shouldAutoHideMenu === 'function' && shouldAutoHideMenu()) { 
+      hideMenu(); 
+    }
 
   } catch (error) {
     showError(error.message);

@@ -64,8 +64,10 @@ async function analyzeActivity(triggeringButtonId) {
     // Perform comprehensive analysis
     await performActivityAnalysis(activityPoints);
 
-    // Hide menu on mobile after successful analysis
-    if (window.innerWidth <= 600) { hideMenu(); }
+    // Hide menu on mobile after successful analysis (if setting enabled)
+    if (window.innerWidth <= 600 && typeof shouldAutoHideMenu === 'function' && shouldAutoHideMenu()) { 
+      hideMenu(); 
+    }
 
   } catch (error) {
     showError(error.message);
@@ -353,6 +355,11 @@ function displayActivityMetrics(metrics) {
   statsHTML += '<hr><div id="tailwindScoreDisplay"></div>';
   statsHTML += '<div id="weatherAnalysisDisplay"></div>';
   document.getElementById('statsContent').innerHTML = statsHTML;
+  
+  // Add stats animation
+  if (typeof animateStatsUpdate === 'function') {
+    animateStatsUpdate();
+  }
 }
 
 /* -------------------------

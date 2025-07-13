@@ -97,8 +97,10 @@ async function processInput(triggeringButtonId) {
          throw new Error('Please provide a GPX file OR both start and end addresses.');
       }
     }
-    // Hide menu on mobile after successful generation/load
-    if (window.innerWidth <= 600) { hideMenu(); }
+    // Hide menu on mobile after successful generation/load (if setting enabled)
+    if (window.innerWidth <= 600 && typeof shouldAutoHideMenu === 'function' && shouldAutoHideMenu()) { 
+      hideMenu(); 
+    }
   } catch (error) {
     showError(error.message);
     document.getElementById('statsContent').innerHTML = 'Route generation failed.';
