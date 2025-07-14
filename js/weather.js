@@ -33,16 +33,18 @@ async function analyzeRoute(points) {
     const estimatedDurationMs = (totalDistanceKm > 0 && avgSpeed > 0) ? (totalDistanceKm / avgSpeed) * 3600 * 1000 : 0;
     const estimatedEndTime = new Date(startTime.getTime() + estimatedDurationMs);
 
-    let statsHTML = `
-      <div><strong>Total Distance:</strong> ${totalDistanceKm.toFixed(1)} km</div>
-      <div><strong>Est. Duration:</strong> ${formatDuration(estimatedDurationMs)}</div>
-      <div><strong>Est. Arrival:</strong> ${estimatedEndTime.toLocaleDateString()} ${estimatedEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-      <div><strong>Avg. Speed Setting:</strong> ${avgSpeed} km/h</div>
-      <hr>
-      <div id="weatherErrorDisplay" class="error-message" style="font-size: 0.9em;"></div>
-      <div id="tailwindScoreDisplay"></div>
-    `;
-    document.getElementById('statsContent').innerHTML = statsHTML;
+    // Calculate elevation metrics for the dashboard
+    const elevationMetrics = calculatePlanningElevationMetrics(points);
+
+    // Create planning dashboard with similar style to activity analysis
+    createPlanningStatsDashboard({
+      totalDistance: totalDistanceKm,
+      estimatedDuration: estimatedDurationMs,
+      estimatedEndTime: estimatedEndTime,
+      startTime: startTime,
+      avgSpeed: avgSpeed,
+      ...elevationMetrics
+    });
     
     // Add stats animation
     if (typeof animateStatsUpdate === 'function') {
@@ -51,6 +53,9 @@ async function analyzeRoute(points) {
 
     // Create elevation profile for planned routes
     createElevationProfile(points, false);
+    
+    // Also create interactive elevation chart for planning if elevation data is available
+    await createPlanningElevationChart(points);
 
     const numPointsInput = document.getElementById('datapointsCount').value;
     const numPoints = parseInt(numPointsInput) || CONFIG.DEFAULTS.WEATHER_POINTS;
@@ -108,7 +113,10 @@ async function analyzeRoute(points) {
     await Promise.all(weatherPromises);
 
     if (weatherErrorCount > 0) {
-       document.getElementById('weatherErrorDisplay').innerHTML = `<i class="fas fa-exclamation-triangle"></i> Failed to load weather for ${weatherErrorCount} point(s).`;
+       const weatherErrorDisplay = document.getElementById('weatherErrorDisplay');
+       if (weatherErrorDisplay) {
+         weatherErrorDisplay.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Failed to load weather for ${weatherErrorCount} point(s).`;
+       }
     }
 
     const tailwindScoreDisplay = document.getElementById('tailwindScoreDisplay');
@@ -118,13 +126,22 @@ async function analyzeRoute(points) {
             const tailwindScore = await computeTailwindScore(points, startTime, avgSpeed);
             const tooltipText = `Average headwind (-) or tailwind (+) component in km/h based on forecast along the route. Positive values indicate tailwind (helpful), negative values indicate headwind (hindering). Higher positive values are better.`;
             tailwindScoreDisplay.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 8px;">
+                <i class="fas fa-wind" style="color: var(--primary-color); font-size: 18px;"></i>
                 <div>
-                   <strong>Tailwind Score:</strong> ${tailwindScore.toFixed(1)} km/h
-                   <i class="fas fa-info-circle" title="${tooltipText}"></i>
-                </div>`;
+                  <strong>Tailwind Score:</strong> ${tailwindScore.toFixed(1)} km/h
+                  <i class="fas fa-info-circle" title="${tooltipText}" style="color: var(--text-color-light); margin-left: 4px;"></i>
+                </div>
+              </div>`;
         } catch (tailwindError) {
             console.error("Error computing tailwind score:", tailwindError);
-            tailwindScoreDisplay.innerHTML = '<div><strong>Tailwind Score:</strong> <i style="color: orange;">Unavailable</i></div>';
+            tailwindScoreDisplay.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 8px;">
+                <i class="fas fa-wind" style="color: var(--text-color-light); font-size: 18px;"></i>
+                <div>
+                  <strong>Tailwind Score:</strong> <i style="color: orange;">Unavailable</i>
+                </div>
+              </div>`;
         }
     }
 
@@ -138,6 +155,152 @@ async function analyzeRoute(points) {
     document.getElementById('statsContent').innerHTML = `Route analysis failed: ${error.message}`;
     windLayerGroup.clearLayers(); tempLayerGroup.clearLayers(); precipLayerGroup.clearLayers();
   }
+}
+
+/* -------------------------
+ * Planning Stats Dashboard (similar to activity analysis)
+ * ------------------------- */
+function createPlanningStatsDashboard(metrics) {
+  const routeType = getCurrentRouteType(); // Determine if it's regular planning, random, or GPX
+  const icon = routeType === 'random' ? 'fa-random' : routeType === 'gpx' ? 'fa-file-code' : 'fa-route';
+  const title = routeType === 'random' ? 'Random Route' : routeType === 'gpx' ? 'GPX Route' : 'Planned Route';
+  const subtitle = routeType === 'random' ? 'Best Tailwind Route Generated' : routeType === 'gpx' ? 'Route Planning' : 'Route Planning';
+
+  const statsHtml = `
+    <div class="journey-stats-dashboard">
+      <div style="display: flex; align-items: center; margin-bottom: 15px;">
+        <i class="fas ${icon}" style="color: var(--primary-color); font-size: 24px; margin-right: 12px;"></i>
+        <div>
+          <h4 style="margin: 0; color: var(--primary-color); font-size: 18px;">${title}</h4>
+          <p style="margin: 0; color: var(--text-color-light); font-size: 13px;">${subtitle}</p>
+        </div>
+      </div>
+      
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-road"></i></div>
+          <div class="stat-value">${metrics.totalDistance.toFixed(1)} km</div>
+          <div class="stat-label">Distance</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-clock"></i></div>
+          <div class="stat-value">${formatDuration(metrics.estimatedDuration)}</div>
+          <div class="stat-label">Est. Duration</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-tachometer-alt"></i></div>
+          <div class="stat-value">${metrics.avgSpeed} km/h</div>
+          <div class="stat-label">Planned Speed</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-flag-checkered"></i></div>
+          <div class="stat-value">${metrics.estimatedEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+          <div class="stat-label">Est. Arrival</div>
+        </div>
+        
+        ${metrics.hasElevation ? `
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-mountain"></i></div>
+          <div class="stat-value">${metrics.totalAscent.toFixed(0)} m</div>
+          <div class="stat-label">Elevation Gain</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-angle-down"></i></div>
+          <div class="stat-value">${metrics.totalDescent.toFixed(0)} m</div>
+          <div class="stat-label">Elevation Loss</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+          <div class="stat-value">${metrics.maxElevation.toFixed(0)} m</div>
+          <div class="stat-label">Max Altitude</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-arrows-alt-v"></i></div>
+          <div class="stat-value">${(metrics.maxElevation - metrics.minElevation).toFixed(0)} m</div>
+          <div class="stat-label">Elevation Range</div>
+        </div>
+        ` : ''}
+      </div>
+      
+      <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-color-light);">
+        <i class="fas fa-play-circle"></i> Departure: ${metrics.startTime.toLocaleString()}<br>
+        <i class="fas fa-flag-checkered"></i> Est. Arrival: ${metrics.estimatedEndTime.toLocaleString()}
+      </div>
+      
+      <div id="weatherErrorDisplay" class="error-message" style="font-size: 0.9em; margin-top: 10px;"></div>
+      <div id="tailwindScoreDisplay" style="margin-top: 15px;"></div>
+    </div>
+  `;
+  
+  document.getElementById('statsContent').innerHTML = statsHtml;
+}
+
+/* -------------------------
+ * Helper function to determine current route type
+ * ------------------------- */
+function getCurrentRouteType() {
+  // Check if we're in random tab
+  const randomTab = document.getElementById('generateRandom');
+  if (randomTab && randomTab.style.display !== 'none') {
+    return 'random';
+  }
+  
+  // Check if a GPX file was loaded
+  const gpxFile = document.getElementById('gpxFile');
+  if (gpxFile && gpxFile.files.length > 0) {
+    return 'gpx';
+  }
+  
+  // Default to regular planning
+  return 'planning';
+}
+
+/* -------------------------
+ * Calculate elevation metrics for planning routes
+ * ------------------------- */
+function calculatePlanningElevationMetrics(points) {
+  let totalAscent = 0;
+  let totalDescent = 0;
+  let maxElevation = -Infinity;
+  let minElevation = Infinity;
+  let hasElevation = false;
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+
+    // Check for elevation data in various formats
+    const prevEle = prev.alt || prev.elevation || prev.ele || null;
+    const currEle = curr.alt || curr.elevation || curr.ele || null;
+
+    if (prevEle !== null && currEle !== null && !isNaN(prevEle) && !isNaN(currEle)) {
+      hasElevation = true;
+      
+      const elevationDiff = currEle - prevEle;
+      if (elevationDiff > 0) {
+        totalAscent += elevationDiff;
+      } else {
+        totalDescent += Math.abs(elevationDiff);
+      }
+      
+      maxElevation = Math.max(maxElevation, currEle);
+      minElevation = Math.min(minElevation, currEle, prevEle);
+    }
+  }
+
+  return {
+    hasElevation: hasElevation,
+    totalAscent: hasElevation ? totalAscent : 0,
+    totalDescent: hasElevation ? totalDescent : 0,
+    maxElevation: hasElevation ? maxElevation : 0,
+    minElevation: hasElevation ? minElevation : 0
+  };
 }
 
 function createWeatherMarkers(forecast, point, km, estTime) {
@@ -270,7 +433,16 @@ async function bestRandomRouteGenerator(triggeringButtonId) {
            console.error(`Candidate ${i+1} (Seed: ${seed}) returned no valid path.`);
            return null;
          }
-         let routePoints = data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
+         let routePoints = data.paths[0].points.coordinates.map(c => {
+           const latLng = L.latLng(c[1], c[0]);
+           // Add elevation data if available (GraphHopper returns [lng, lat, elevation])
+           if (c.length > 2 && c[2] !== null && !isNaN(c[2])) {
+             latLng.alt = c[2];
+             latLng.elevation = c[2];
+             latLng.ele = c[2];
+           }
+           return latLng;
+         });
          let actualDistance = computeTotalDistance(routePoints);
          if (Math.abs(actualDistance - routeLengthMeters) / routeLengthMeters > 0.5) {
            console.warn(`Candidate ${i+1} (Seed: ${seed}) distance ${Math.round(actualDistance/1000)}km differs >50% from target ${routeLengthKm}km.`);
@@ -552,6 +724,356 @@ function createElevationProfile(points, isAnalysis = false) {
       <span>${totalDistance.toFixed(1)} km</span>
     </div>
   `;
+}
+
+/* -------------------------
+ * Interactive Planning Elevation Chart
+ * ------------------------- */
+async function createPlanningElevationChart(points) {
+  const chartSection = document.getElementById('elevationChartSection');
+  const chartCanvas = document.getElementById('elevationChart');
+  
+  if (!chartSection || !chartCanvas || !window.Chart) {
+    console.warn('Chart.js not available or chart elements not found');
+    return;
+  }
+
+  // Check if we have elevation data
+  let elevationData = [];
+  let cumulativeDistance = 0;
+  let hasElevation = false;
+
+  console.log(`Planning chart: Processing ${points.length} points for elevation data`);
+
+  for (let i = 0; i < points.length; i++) {
+    if (i > 0) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const segmentDistance = calculateDistanceForProfile(prev.lat, prev.lng, curr.lat, curr.lng);
+      cumulativeDistance += segmentDistance / 1000; // Convert to km
+    }
+
+    // For planned routes, elevation might be in different format
+    let elevation = points[i].alt || points[i].elevation || points[i].ele || null;
+
+    if (elevation !== null && !isNaN(elevation)) {
+      hasElevation = true;
+      elevationData.push({
+        distance: cumulativeDistance,
+        elevation: elevation,
+        lat: points[i].lat,
+        lng: points[i].lng
+      });
+    }
+  }
+
+  console.log(`Planning chart: Found ${elevationData.length} points with elevation data out of ${points.length} total points`);
+
+  // If we don't have enough elevation data from GraphHopper, try to get it from an external service
+  if (!hasElevation || elevationData.length < 5) {
+    console.log('Not enough elevation data from GraphHopper, trying external elevation service...');
+    
+    try {
+      const enhancedPoints = await addElevationDataToPoints(points);
+      
+      // Re-process with enhanced elevation data
+      elevationData = [];
+      cumulativeDistance = 0;
+      hasElevation = false;
+
+      for (let i = 0; i < enhancedPoints.length; i++) {
+        if (i > 0) {
+          const prev = enhancedPoints[i - 1];
+          const curr = enhancedPoints[i];
+          const segmentDistance = calculateDistanceForProfile(prev.lat, prev.lng, curr.lat, curr.lng);
+          cumulativeDistance += segmentDistance / 1000;
+        }
+
+        let elevation = enhancedPoints[i].alt || enhancedPoints[i].elevation || enhancedPoints[i].ele || null;
+
+        if (elevation !== null && !isNaN(elevation)) {
+          hasElevation = true;
+          elevationData.push({
+            distance: cumulativeDistance,
+            elevation: elevation,
+            lat: enhancedPoints[i].lat,
+            lng: enhancedPoints[i].lng
+          });
+        }
+      }
+      
+      console.log(`Planning chart: After external service, found ${elevationData.length} points with elevation data`);
+    } catch (error) {
+      console.warn('External elevation service failed:', error);
+    }
+  }
+
+  if (!hasElevation || elevationData.length < 5) {
+    console.log('Still not enough elevation data for chart, hiding elevation section');
+    chartSection.style.display = 'none';
+    return;
+  }
+
+  // Show the chart section
+  chartSection.style.display = 'block';
+  chartSection.classList.remove('collapsed'); // Start expanded
+  
+  // Set the correct icon on the toggle button
+  const toggleBtn = document.getElementById('toggleElevationChart');
+  if (toggleBtn) {
+    toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+  }
+  
+  // Initialize toggle functionality (defined in activity.js)
+  if (typeof initElevationChartToggle === 'function') {
+    initElevationChartToggle();
+  }
+
+  // Destroy existing chart if it exists
+  if (typeof elevationChart !== 'undefined' && elevationChart) {
+    elevationChart.destroy();
+  }
+
+  // Prepare chart data
+  const labels = elevationData.map(p => p.distance.toFixed(1));
+  const chartElevationData = elevationData.map(p => p.elevation);
+  
+  const ctx = chartCanvas.getContext('2d');
+  
+  elevationChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Elevation (m)',
+        data: chartElevationData,
+        borderColor: '#007bff', // Blue color for planned routes
+        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.2,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#007bff',
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        title: {
+          display: false
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            title: function(context) {
+              return `Distance: ${context[0].label} km`;
+            },
+            label: function(context) {
+              return `Elevation: ${context.parsed.y.toFixed(0)} m`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Distance (km)',
+            color: '#6c757d'
+          },
+          grid: {
+            color: 'rgba(0,0,0,0.1)'
+          }
+        },
+        y: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Elevation (m)',
+            color: '#6c757d'
+          },
+          grid: {
+            color: 'rgba(0,0,0,0.1)'
+          }
+        }
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      onHover: function(event, activeElements) {
+        if (activeElements && activeElements.length > 0) {
+          const dataIndex = activeElements[0].index;
+          const profilePoint = elevationData[dataIndex];
+          
+          if (profilePoint && map) {
+            // Create a temporary marker if it doesn't exist
+            if (!window.planningElevationMarker) {
+              const markerIcon = L.divIcon({
+                className: 'planning-elevation-marker',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+                html: `<div style="background: #007bff; border-radius: 50%; width: 16px; height: 16px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`
+              });
+              
+              window.planningElevationMarker = L.marker([profilePoint.lat, profilePoint.lng], { 
+                icon: markerIcon,
+                zIndexOffset: 1000
+              }).addTo(map);
+            } else {
+              // Move existing marker
+              window.planningElevationMarker.setLatLng([profilePoint.lat, profilePoint.lng]);
+            }
+            
+            // Add a subtle animation
+            const markerElement = window.planningElevationMarker.getElement();
+            if (markerElement) {
+              markerElement.style.transform = 'scale(1.3)';
+              setTimeout(() => {
+                if (markerElement) {
+                  markerElement.style.transform = 'scale(1)';
+                }
+              }, 200);
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+/* -------------------------
+ * External Elevation Service
+ * ------------------------- */
+async function addElevationDataToPoints(points) {
+  // Sample points along the route (max 50 points to avoid API limits)
+  const maxPoints = 50;
+  let sampledPoints = points;
+  
+  if (points.length > maxPoints) {
+    const sampleEvery = Math.floor(points.length / maxPoints);
+    sampledPoints = points.filter((_, index) => index % sampleEvery === 0);
+    // Always include the last point
+    if (sampledPoints[sampledPoints.length - 1] !== points[points.length - 1]) {
+      sampledPoints.push(points[points.length - 1]);
+    }
+  }
+
+  console.log(`Fetching elevation for ${sampledPoints.length} sampled points using Open-Elevation API`);
+
+  try {
+    // Use Open-Elevation API (free, no API key required)
+    const locations = sampledPoints.map(p => ({ latitude: p.lat, longitude: p.lng }));
+    
+    const response = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ locations })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Open-Elevation API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.results || data.results.length === 0) {
+      throw new Error('No elevation data returned from Open-Elevation API');
+    }
+
+    // Map the elevation data back to the sampled points
+    const enhancedPoints = sampledPoints.map((point, index) => {
+      const elevationResult = data.results[index];
+      return {
+        ...point,
+        alt: elevationResult.elevation,
+        elevation: elevationResult.elevation,
+        ele: elevationResult.elevation
+      };
+    });
+
+    console.log(`Successfully enhanced ${enhancedPoints.length} points with elevation data`);
+    return enhancedPoints;
+
+  } catch (error) {
+    console.error('Failed to fetch elevation data:', error);
+    
+    // Fallback: try to interpolate elevation data if we have some points with elevation
+    const pointsWithElevation = points.filter(p => 
+      (p.alt !== null && !isNaN(p.alt)) || 
+      (p.elevation !== null && !isNaN(p.elevation)) || 
+      (p.ele !== null && !isNaN(p.ele))
+    );
+    
+    if (pointsWithElevation.length >= 2) {
+      console.log(`Interpolating elevation for ${points.length} points based on ${pointsWithElevation.length} points with existing elevation`);
+      return interpolateElevationData(points, pointsWithElevation);
+    }
+    
+    throw error;
+  }
+}
+
+function interpolateElevationData(allPoints, elevationPoints) {
+  // Simple linear interpolation between known elevation points
+  return allPoints.map(point => {
+    // If this point already has elevation, keep it
+    const existingElevation = point.alt || point.elevation || point.ele;
+    if (existingElevation !== null && !isNaN(existingElevation)) {
+      return {
+        ...point,
+        alt: existingElevation,
+        elevation: existingElevation,
+        ele: existingElevation
+      };
+    }
+
+    // Find the two closest elevation points
+    let beforePoint = null;
+    let afterPoint = null;
+    
+    for (let i = 0; i < elevationPoints.length; i++) {
+      const elevPoint = elevationPoints[i];
+      const distance = calculateDistanceForProfile(point.lat, point.lng, elevPoint.lat, elevPoint.lng);
+      
+      if (elevPoint.lat <= point.lat || elevPoint.lng <= point.lng) {
+        beforePoint = elevPoint;
+      } else if (!afterPoint) {
+        afterPoint = elevPoint;
+        break;
+      }
+    }
+
+    // Interpolate elevation
+    let interpolatedElevation = 0;
+    if (beforePoint && afterPoint) {
+      const beforeElev = beforePoint.alt || beforePoint.elevation || beforePoint.ele || 0;
+      const afterElev = afterPoint.alt || afterPoint.elevation || afterPoint.ele || 0;
+      interpolatedElevation = (beforeElev + afterElev) / 2;
+    } else if (beforePoint) {
+      interpolatedElevation = beforePoint.alt || beforePoint.elevation || beforePoint.ele || 0;
+    } else if (afterPoint) {
+      interpolatedElevation = afterPoint.alt || afterPoint.elevation || afterPoint.ele || 0;
+    }
+
+    return {
+      ...point,
+      alt: interpolatedElevation,
+      elevation: interpolatedElevation,
+      ele: interpolatedElevation
+    };
+  });
 }
 
 function calculateDistanceForProfile(lat1, lng1, lat2, lng2) {

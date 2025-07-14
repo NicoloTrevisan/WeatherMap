@@ -196,10 +196,11 @@
         <div class="stats-box" id="stats">
           <div id="errorDisplay" class="error-message"></div>
           <div id="statsContent">No route loaded. Use the options above or load a GPX file.</div>
-          <div id="elevationProfile" class="elevation-profile"></div>
           </div>
       </div>
       
+
+
       <div class="section">
         <p style="font-size: 13px; color: #6c757d; line-height: 1.5;">
            <i class="fas fa-info-circle"></i> <strong>Map Interaction:</strong><br>
@@ -209,6 +210,22 @@
       </div>
     </div>
     <div id="map"></div>
+  </div>
+  
+  <!-- Interactive Elevation Chart - Bottom of Page -->
+  <div id="elevationChartSection" style="display: none;">
+    <div id="elevationChartContainer">
+      <div class="elevation-header">
+        <h3><i class="fas fa-chart-area"></i> Interactive Elevation Profile</h3>
+        <button id="toggleElevationChart" class="elevation-toggle">
+          <i class="fas fa-chevron-up"></i>
+        </button>
+      </div>
+      <div id="elevationChartContent" class="elevation-content">
+        <canvas id="elevationChart"></canvas>
+        <p class="chart-hint"><i class="fas fa-mouse-pointer"></i> Hover over the chart to see corresponding location on map</p>
+      </div>
+    </div>
   </div>
 
   <div id="menuToggle" onclick="toggleMenu()">Hide Menu</div>
@@ -334,6 +351,8 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+  <script src="js/lib/gpx.js"></script>
   <script src="js/app.js"></script>
   <script src="js/map.js"></script>
   <script src="js/weather.js"></script>

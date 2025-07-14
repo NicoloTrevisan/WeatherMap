@@ -1,5 +1,5 @@
 /* -------------------------
- * Activity Analysis Functions
+ * Enhanced Activity Analysis Functions with Animations
  * ------------------------- */
 
 // Global variables for activity analysis
@@ -7,6 +7,9 @@ let activityData = null;
 let elevationProfile = [];
 let historicalWeatherMarkers = L.layerGroup();
 let activitySpecialMarkers = L.layerGroup();
+let elevationChart = null;
+let journeyMarker = null;
+let routeAnimationLayer = null;
 
 /* -------------------------
  * Main Activity Analysis Function
@@ -37,14 +40,10 @@ async function analyzeActivity(triggeringButtonId) {
       fileName: file.name
     };
 
-    // Display the route on the map with green dashed line
-    trackLayer = L.polyline(activityPoints.map(p => L.latLng(p.lat, p.lng)), { 
-      className: 'route-line',
-      color: '#28a745', // Green color for analyzed activities
-      dashArray: '8, 4' // Dashed line
-    }).addTo(map);
+    // Create route instantly without animation
+    drawInstantRoute(activityPoints);
     
-    map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+    map.fitBounds(L.latLngBounds(activityPoints.map(p => [p.lat, p.lng])), { padding: [30, 30] });
 
     // Add start/end markers with same icons as planning
     const startMarker = L.marker([activityPoints[0].lat, activityPoints[0].lng], { 
@@ -75,6 +74,37 @@ async function analyzeActivity(triggeringButtonId) {
   } finally {
     hideLoading();
   }
+}
+
+/* -------------------------
+ * Animated Route Drawing
+ * ------------------------- */
+function drawInstantRoute(points) {
+  // Create the route polyline with dashed style for activities - instantly
+  const routePoints = points.map(p => [p.lat, p.lng]);
+  routeAnimationLayer = L.polyline(routePoints, { 
+    className: 'route-line',
+    color: '#28a745', // Green color for analyzed activities
+    dashArray: '8, 4', // Dashed line
+    weight: 4
+  }).addTo(map);
+
+  // Create journey marker at the end of the route
+  const bikeIcon = L.divIcon({
+    className: 'journey-marker',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    html: `<div style="background: #28a745; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
+             <i class="fas fa-bicycle" style="color: white; font-size: 16px;"></i>
+           </div>`
+  });
+
+  // Place journey marker at the end of the route
+  const endPoint = points[points.length - 1];
+  journeyMarker = L.marker([endPoint.lat, endPoint.lng], { icon: bikeIcon }).addTo(map);
+  
+  // Make marker globally accessible for chart interaction
+  window.journeyMarker = journeyMarker;
 }
 
 /* -------------------------
@@ -151,14 +181,16 @@ async function performActivityAnalysis(points) {
     // Calculate elevation profile
     elevationProfile = calculateElevationProfile(points);
     
-    // Create elevation profile display
-    createElevationProfile(points, true);
+    // Create enhanced journey stats dashboard
+    createJourneyStatsDashboard(metrics);
+    
+    // Create interactive elevation chart if we have elevation data
+    if (metrics.hasElevation && elevationProfile.length > 10) {
+      createInteractiveElevationChart(elevationProfile);
+    }
     
     // Add special markers for highest point and fastest speed
     addSpecialMarkers(points, metrics);
-    
-    // Display initial results
-    displayActivityMetrics(metrics);
 
     // Calculate tailwind score if we have timestamps
     if (metrics.hasTimestamps && activityData.startTime) {
@@ -179,6 +211,250 @@ async function performActivityAnalysis(points) {
     console.error('Error during activity analysis:', error);
     showError(`Analysis failed: ${error.message}`);
   }
+}
+
+/* -------------------------
+ * Enhanced Journey Stats Dashboard
+ * ------------------------- */
+function createJourneyStatsDashboard(metrics) {
+  const statsHtml = `
+    <div class="journey-stats-dashboard">
+      <div style="display: flex; align-items: center; margin-bottom: 15px;">
+        <i class="fas fa-route" style="color: var(--success-color); font-size: 24px; margin-right: 12px;"></i>
+        <div>
+          <h4 style="margin: 0; color: var(--success-color); font-size: 18px;">${activityData.fileName}</h4>
+          <p style="margin: 0; color: var(--text-color-light); font-size: 13px;">Journey Analysis</p>
+        </div>
+      </div>
+      
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-road"></i></div>
+          <div class="stat-value">${metrics.totalDistance.toFixed(1)} km</div>
+          <div class="stat-label">Distance</div>
+        </div>
+        
+        ${metrics.hasTimestamps && metrics.movingTime > 0 ? `
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-clock"></i></div>
+          <div class="stat-value">${formatDuration(metrics.movingTime * 1000)}</div>
+          <div class="stat-label">Moving Time</div>
+        </div>
+        ` : ''}
+        
+        ${metrics.avgSpeed ? `
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-tachometer-alt"></i></div>
+          <div class="stat-value">${metrics.avgSpeed.toFixed(1)} km/h</div>
+          <div class="stat-label">Avg Speed</div>
+        </div>
+        ` : ''}
+        
+        ${metrics.maxSpeed ? `
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-rocket"></i></div>
+          <div class="stat-value">${metrics.maxSpeed.toFixed(1)} km/h</div>
+          <div class="stat-label">Max Speed</div>
+        </div>
+        ` : ''}
+        
+        ${metrics.hasElevation ? `
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-mountain"></i></div>
+          <div class="stat-value">${metrics.totalAscent.toFixed(0)} m</div>
+          <div class="stat-label">Elevation Gain</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-angle-down"></i></div>
+          <div class="stat-value">${metrics.totalDescent.toFixed(0)} m</div>
+          <div class="stat-label">Elevation Loss</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-flag-checkered"></i></div>
+          <div class="stat-value">${metrics.maxElevation.toFixed(0)} m</div>
+          <div class="stat-label">Max Altitude</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon"><i class="fas fa-arrows-alt-v"></i></div>
+          <div class="stat-value">${(metrics.maxElevation - metrics.minElevation).toFixed(0)} m</div>
+          <div class="stat-label">Elevation Range</div>
+        </div>
+        ` : ''}
+      </div>
+      
+      ${metrics.hasTimestamps ? `
+      <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-color-light);">
+        <i class="fas fa-play-circle"></i> Started: ${metrics.startTime.toLocaleString()}<br>
+        <i class="fas fa-stop-circle"></i> Finished: ${metrics.endTime.toLocaleString()}
+      </div>
+      ` : ''}
+      
+      <div id="tailwindScoreDisplay" style="margin-top: 15px;"></div>
+      <div id="weatherAnalysisDisplay" style="margin-top: 10px;"></div>
+    </div>
+  `;
+  
+  document.getElementById('statsContent').innerHTML = statsHtml;
+  
+  // Add stats animation
+  if (typeof animateStatsUpdate === 'function') {
+    animateStatsUpdate();
+  }
+}
+
+/* -------------------------
+ * Elevation Chart Toggle & Interaction
+ * ------------------------- */
+function initElevationChartToggle() {
+  const chartSection = document.getElementById('elevationChartSection');
+  const header = chartSection.querySelector('.elevation-header');
+  
+  if (header) {
+    header.addEventListener('click', () => {
+      chartSection.classList.toggle('collapsed');
+    });
+  }
+}
+
+/* -------------------------
+ * Interactive Elevation Chart with Chart.js
+ * ------------------------- */
+function createInteractiveElevationChart(profile) {
+  const chartSection = document.getElementById('elevationChartSection');
+  const chartCanvas = document.getElementById('elevationChart');
+  
+  if (!chartSection || !chartCanvas || !window.Chart) {
+    console.warn('Chart.js not available or chart elements not found');
+    return;
+  }
+
+  // Show the chart section
+  chartSection.style.display = 'block';
+  chartSection.classList.remove('collapsed'); // Start expanded
+  
+  // Set the correct icon on the toggle button
+  const toggleBtn = document.getElementById('toggleElevationChart');
+  if (toggleBtn) {
+    toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+  }
+  
+  // Initialize toggle functionality
+  initElevationChartToggle();
+
+  // Destroy existing chart if it exists
+  if (elevationChart) {
+    elevationChart.destroy();
+  }
+
+  // Prepare chart data
+  const labels = profile.map(p => p.distance.toFixed(1));
+  const elevationData = profile.map(p => p.elevation);
+  
+  const ctx = chartCanvas.getContext('2d');
+  
+  elevationChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Elevation (m)',
+        data: elevationData,
+        borderColor: '#28a745',
+        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.2,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#28a745',
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        title: {
+          display: false
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            title: function(context) {
+              return `Distance: ${context[0].label} km`;
+            },
+            label: function(context) {
+              return `Elevation: ${context.parsed.y.toFixed(0)} m`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Distance (km)',
+            color: '#6c757d'
+          },
+          grid: {
+            color: 'rgba(0,0,0,0.1)'
+          }
+        },
+        y: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Elevation (m)',
+            color: '#6c757d'
+          },
+          grid: {
+            color: 'rgba(0,0,0,0.1)'
+          }
+        }
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      onHover: (event, activeElements) => {
+        if (activeElements && activeElements.length > 0) {
+          const dataIndex = activeElements[0].index;
+          const profilePoint = profile[dataIndex];
+          const marker = window.journeyMarker || journeyMarker;
+          
+          if (marker && profilePoint && typeof profilePoint.lat === 'number' && typeof profilePoint.lng === 'number') {
+            // Move the journey marker to the corresponding position on the map
+            marker.setLatLng([profilePoint.lat, profilePoint.lng]);
+            
+            // Add a subtle animation
+            const markerElement = marker.getElement();
+            if (markerElement) {
+              markerElement.style.transition = 'transform 0.1s ease';
+              markerElement.style.transform = 'scale(1.2)';
+            }
+          }
+        } else {
+          // Reset marker scale when not hovering
+          const marker = window.journeyMarker || journeyMarker;
+          if (marker) {
+            const markerElement = marker.getElement();
+            if (markerElement) {
+              markerElement.style.transform = 'scale(1)';
+            }
+          }
+        }
+      }
+    }
+  });
 }
 
 function calculateActivityMetrics(points) {
@@ -320,48 +596,6 @@ function calculateElevationProfile(points) {
   return profile;
 }
 
-function displayActivityMetrics(metrics) {
-  let statsHTML = `
-    <div><strong>Activity:</strong> ${activityData.fileName}</div>
-    <div><strong>Total Distance:</strong> ${metrics.totalDistance.toFixed(1)} km</div>
-  `;
-
-  if (metrics.hasTimestamps && metrics.movingTime > 0) {
-    const duration = formatDuration(metrics.movingTime * 1000);
-    statsHTML += `
-      <div><strong>Moving Time:</strong> ${duration}</div>
-      <div><strong>Start Time:</strong> ${metrics.startTime.toLocaleString()}</div>
-      <div><strong>End Time:</strong> ${metrics.endTime.toLocaleString()}</div>
-    `;
-    
-    if (metrics.avgSpeed) {
-      statsHTML += `
-        <div><strong>Avg Speed:</strong> ${metrics.avgSpeed.toFixed(1)} km/h</div>
-        <div><strong>Max Speed:</strong> ${metrics.maxSpeed.toFixed(1)} km/h</div>
-      `;
-    }
-  }
-
-  if (metrics.hasElevation) {
-    statsHTML += `
-      <hr>
-      <div><strong>Total Ascent:</strong> ${metrics.totalAscent.toFixed(0)} m</div>
-      <div><strong>Total Descent:</strong> ${metrics.totalDescent.toFixed(0)} m</div>
-      <div><strong>Max Elevation:</strong> ${metrics.maxElevation.toFixed(0)} m</div>
-      <div><strong>Min Elevation:</strong> ${metrics.minElevation.toFixed(0)} m</div>
-    `;
-  }
-
-  statsHTML += '<hr><div id="tailwindScoreDisplay"></div>';
-  statsHTML += '<div id="weatherAnalysisDisplay"></div>';
-  document.getElementById('statsContent').innerHTML = statsHTML;
-  
-  // Add stats animation
-  if (typeof animateStatsUpdate === 'function') {
-    animateStatsUpdate();
-  }
-}
-
 /* -------------------------
  * Tailwind Score Calculation for Activities
  * ------------------------- */
@@ -436,9 +670,12 @@ function updateStatsWithTailwind(tailwindScore) {
   if (tailwindDisplay) {
     const tooltipText = `Average headwind (-) or tailwind (+) component during your ride. Positive values indicate wind helped you, negative values indicate wind hindered you.`;
     tailwindDisplay.innerHTML = `
-      <div>
-        <strong>Tailwind Score:</strong> ${tailwindScore.toFixed(1)} km/h
-        <i class="fas fa-info-circle" title="${tooltipText}"></i>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 8px;">
+        <i class="fas fa-wind" style="color: var(--primary-color); font-size: 18px;"></i>
+        <div>
+          <strong>Tailwind Score:</strong> ${tailwindScore.toFixed(1)} km/h
+          <i class="fas fa-info-circle" title="${tooltipText}" style="color: var(--text-color-light); margin-left: 4px;"></i>
+        </div>
       </div>`;
   }
 }
@@ -501,7 +738,12 @@ async function fetchHistoricalWeather(points) {
     }
     
     document.getElementById('weatherAnalysisDisplay').innerHTML = 
-      '<div><strong>Historical Weather:</strong> Weather conditions during your ride are shown on the map. Use the weather toggle to switch between wind, temperature, and precipitation views.</div>';
+      `<div style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 8px;">
+        <i class="fas fa-cloud-sun" style="color: var(--success-color); font-size: 18px;"></i>
+        <div>
+          <strong>Historical Weather:</strong> Weather conditions during your ride are shown on the map. Use the weather toggle to switch between wind, temperature, and precipitation views.
+        </div>
+      </div>`;
 
   } catch (error) {
     console.error('Historical weather analysis failed:', error);

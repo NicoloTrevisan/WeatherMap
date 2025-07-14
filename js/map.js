@@ -193,8 +193,17 @@ async function calculateCyclingRoute(coordsArray) {
     if (!data.paths || data.paths.length === 0 || !data.paths[0].points || data.paths[0].points.coordinates.length === 0) {
         throw new Error("Routing API Error: No route found or invalid response structure.");
     }
-    // Map the coordinates [lng, lat] from GraphHopper to Leaflet's L.latLng(lat, lng)
-    return data.paths[0].points.coordinates.map(c => L.latLng(c[1], c[0]));
+    // Map the coordinates [lng, lat, elevation] from GraphHopper to Leaflet's L.latLng(lat, lng) with elevation
+    return data.paths[0].points.coordinates.map(c => {
+      const latLng = L.latLng(c[1], c[0]);
+      // Add elevation data if available (GraphHopper returns [lng, lat, elevation])
+      if (c.length > 2 && c[2] !== null && !isNaN(c[2])) {
+        latLng.alt = c[2];
+        latLng.elevation = c[2];
+        latLng.ele = c[2];
+      }
+      return latLng;
+    });
 }
 
 async function geocodeLocation(query) {
@@ -384,6 +393,18 @@ function clearRouteData() {
        trackLayer = null;
    }
    
+   // Remove animated route layer
+   if (typeof routeAnimationLayer !== 'undefined' && routeAnimationLayer) {
+       map.removeLayer(routeAnimationLayer);
+       routeAnimationLayer = null;
+   }
+   
+   // Remove journey marker
+   if (typeof journeyMarker !== 'undefined' && journeyMarker) {
+       map.removeLayer(journeyMarker);
+       journeyMarker = null;
+   }
+   
    // Clear weather layers (used by both planning and analysis)
    windLayerGroup.clearLayers();
    tempLayerGroup.clearLayers();
@@ -438,6 +459,22 @@ function clearRouteData() {
    if (elevationProfileContainer) {
      elevationProfileContainer.style.display = 'none';
      elevationProfileContainer.innerHTML = '';
+   }
+   
+   // Clear interactive elevation chart
+   if (typeof elevationChart !== 'undefined' && elevationChart) {
+     elevationChart.destroy();
+     elevationChart = null;
+   }
+   const chartSection = document.getElementById('elevationChartSection');
+   if (chartSection) {
+     chartSection.style.display = 'none';
+   }
+   
+   // Clear planning elevation marker
+   if (window.planningElevationMarker) {
+     map.removeLayer(window.planningElevationMarker);
+     window.planningElevationMarker = null;
    }
 
    // Reset weather layer state

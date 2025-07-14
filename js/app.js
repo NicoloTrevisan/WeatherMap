@@ -585,7 +585,7 @@ function toggleHelpPopup() {
  * Demo Route Function
  * ------------------------- */
 async function loadDemo(mode) {
-  const demoFile = 'Demo/From_Nijmegen_to_Maastricht.gpx';
+  const demoFile = 'Demo/Ronde_van_Nijmegen.gpx';
   const buttonId = mode === 'plan' ? 'planDemoButton' : mode === 'analyze' ? 'analyzeDemoButton' : 'randomDemoButton';
   showLoading(buttonId, "Loading Demo...");
   hideWelcomeModal();
@@ -611,7 +611,7 @@ async function loadDemo(mode) {
         throw new Error(`Could not fetch demo file: ${response.statusText}`);
       }
       const gpxText = await response.text();
-      const file = new File([gpxText], "From_Nijmegen_to_Maastricht.gpx", { type: "application/gpx+xml" });
+      const file = new File([gpxText], "Ronde_van_Nijmegen.gpx", { type: "application/gpx+xml" });
 
       clearRouteData();
 
