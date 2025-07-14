@@ -127,7 +127,7 @@ function initMap() {
   [
     'generateRouteButton', 'generateRandomButton', 'loadGpxButton', 
     'saveGpxButton', 'clearMapButton', 'loadActivityButton', 
-    'analyzeActivityButton', 'planDemoButton', 'analyzeDemoButton'
+    'analyzeActivityButton', 'planDemoButton', 'analyzeDemoButton', 'randomDemoButton'
   ].forEach(id => {
      const btn = document.getElementById(id);
      if (btn) activeButtons[id] = btn.innerHTML;
@@ -246,6 +246,8 @@ function initWelcomeModal() {
   const skipWelcomeButton = document.getElementById('skipWelcomeButton');
   const planDemoButton = document.getElementById('planDemoButton');
   const analyzeDemoButton = document.getElementById('analyzeDemoButton');
+  const startRandomButton = document.getElementById('startRandomButton');
+  const randomDemoButton = document.getElementById('randomDemoButton');
 
   // For demonstration, we always show the welcome modal.
   if (welcomeOverlay) {
@@ -263,6 +265,12 @@ function initWelcomeModal() {
     analyzeDemoButton.addEventListener('click', (e) => {
       e.stopPropagation(); // Prevent card click event
       loadDemo('analyze');
+    });
+  }
+  if (randomDemoButton) {
+    randomDemoButton.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent card click event
+      loadDemo('random');
     });
   }
 
@@ -290,6 +298,15 @@ function initWelcomeModal() {
           }, 2000);
         }
       }, 300);
+    });
+  }
+
+  // Start random button
+  if (startRandomButton) {
+    startRandomButton.addEventListener('click', () => {
+      hideWelcomeModal();
+      showTab('plan', document.getElementById('tabPlanBtn'));
+      showSubTab('generateRandom', document.getElementById('subTabGenerateBtn'));
     });
   }
 
@@ -569,50 +586,66 @@ function toggleHelpPopup() {
  * ------------------------- */
 async function loadDemo(mode) {
   const demoFile = 'Demo/From_Nijmegen_to_Maastricht.gpx';
-  const buttonId = mode === 'plan' ? 'planDemoButton' : 'analyzeDemoButton';
+  const buttonId = mode === 'plan' ? 'planDemoButton' : mode === 'analyze' ? 'analyzeDemoButton' : 'randomDemoButton';
   showLoading(buttonId, "Loading Demo...");
   hideWelcomeModal();
 
   try {
-    const response = await fetch(demoFile);
-    if (!response.ok) {
-      throw new Error(`Could not fetch demo file: ${response.statusText}`);
-    }
-    const gpxText = await response.text();
-    const file = new File([gpxText], "From_Nijmegen_to_Maastricht.gpx", { type: "application/gpx+xml" });
-
-    clearRouteData();
-
-    if (mode === 'plan') {
+    if (mode === 'random') {
+      // For random demo, generate a random route instead of loading GPX
       showTab('plan', document.getElementById('tabPlanBtn'));
-      const points = await parseGPX(file);
-      if (!points || points.length < 2) throw new Error("Demo GPX file contains insufficient points.");
+      showSubTab('generateRandom', document.getElementById('subTabRandomBtn'));
       
-      trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
-      map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+      // Set a demo location and trigger random route generation
+      document.getElementById('randomLocation').value = 'Nijmegen, Netherlands';
+      document.getElementById('routeLengthSlider').value = '75';
+      document.getElementById('routeLengthValue').textContent = '75 km';
       
-      L.marker(points[0], { icon: startIcon, interactive: false }).addTo(map);
-      L.marker(points[points.length - 1], { icon: endIcon, interactive: false }).addTo(map);
-      waypoints = [];
+      // Automatically trigger random route generation
+      await bestRandomRouteGenerator('randomDemoButton');
       
-      await analyzeRoute(points);
-      document.getElementById('fileName').textContent = file.name;
+    } else {
+      // Original demo logic for plan and analyze modes
+      const response = await fetch(demoFile);
+      if (!response.ok) {
+        throw new Error(`Could not fetch demo file: ${response.statusText}`);
+      }
+      const gpxText = await response.text();
+      const file = new File([gpxText], "From_Nijmegen_to_Maastricht.gpx", { type: "application/gpx+xml" });
 
-    } else if (mode === 'analyze') {
-      showTab('analyze', document.getElementById('tabAnalyzeBtn'));
-      
-      // Simulate file input
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(file);
-      const fileInput = document.getElementById('activityGpxFile');
-      fileInput.files = dataTransfer.files;
-      
-      // Manually trigger the change event logic
-      document.getElementById('activityFileName').textContent = file.name;
-      document.getElementById('analyzeActivityButton').disabled = false;
-      
-      // Automatically trigger analysis
-      await analyzeActivity('analyzeActivityButton');
+      clearRouteData();
+
+      if (mode === 'plan') {
+        showTab('plan', document.getElementById('tabPlanBtn'));
+        const points = await parseGPX(file);
+        if (!points || points.length < 2) throw new Error("Demo GPX file contains insufficient points.");
+        
+        trackLayer = L.polyline(points, { className: 'route-line' }).addTo(map);
+        map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+        
+        L.marker(points[0], { icon: startIcon, interactive: false }).addTo(map);
+        L.marker(points[points.length - 1], { icon: endIcon, interactive: false }).addTo(map);
+        waypoints = [];
+        
+        await analyzeRoute(points);
+        document.getElementById('fileName').textContent = file.name;
+
+      } else if (mode === 'analyze') {
+        showTab('analyze', document.getElementById('tabAnalyzeBtn'));
+        
+        // Simulate file input
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        const fileInput = document.getElementById('activityGpxFile');
+        fileInput.files = dataTransfer.files;
+        
+        // Manually trigger the change event logic
+        document.getElementById('activityFileName').textContent = file.name;
+        document.getElementById('analyzeActivityButton').disabled = false;
+        
+        // Automatically trigger analysis
+        await analyzeActivity('analyzeActivityButton');
+      }
     }
 
     if (window.innerWidth <= 600 && shouldAutoHideMenu()) {
