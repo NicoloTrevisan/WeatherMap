@@ -357,6 +357,26 @@ function hideLoading() {
 /* -------------------------
  * Menu Toggle Functions
  * ------------------------- */
+// Utility: keep elevation chart aligned with map (desktop)
+function updateElevationChartOffset() {
+  const chartSection = document.getElementById('elevationChartSection');
+  const controls = document.getElementById('controls');
+  if (!chartSection) return;
+  if (window.innerWidth > 600) { // Desktop
+    if (controls && !controls.classList.contains('hidden')) {
+      const offset = 320; // sidebar width
+      chartSection.style.left = offset + 'px';
+      chartSection.style.width = `calc(100% - ${offset}px)`; // stay within viewport
+    } else {
+      chartSection.style.left = '0';
+      chartSection.style.width = '100%';
+    }
+  } else {
+    chartSection.style.left = '0'; // Mobile full-width
+    chartSection.style.width = '100%';
+  }
+}
+
 function handleResize() {
    // Invalidate map size to ensure it redraws correctly
    map.invalidateSize();
@@ -385,6 +405,8 @@ function handleResize() {
       // This might need adjustment based on exact flex behavior desired
        mapElement.style.height = `calc(100vh - ${controls.offsetHeight}px)`;
    }
+   // NEW: keep elevation chart aligned
+   updateElevationChartOffset();
 }
 
 function hideMenu() {
@@ -406,6 +428,8 @@ function hideMenu() {
     // Delay invalidateSize slightly
     setTimeout(() => { map.invalidateSize({ pan: false }); }, 50);
   }
+  // NEW
+  updateElevationChartOffset();
 }
 
 function showMenu() {
@@ -432,6 +456,8 @@ function showMenu() {
    if (window.innerWidth > 600) {
        setTimeout(() => { map.invalidateSize({ pan: false }); }, 310);
    }
+  // NEW
+  updateElevationChartOffset();
 }
 
 function toggleMenu() {

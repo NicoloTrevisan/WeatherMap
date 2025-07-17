@@ -814,6 +814,45 @@ async function createPlanningElevationChart(points) {
     return;
   }
 
+  // ==== Peak detection & naming (async, non-blocking) ====
+  const peakIndices = detectPeaks(elevationData, 50); // 50 m prominence
+  // Prepare a set for quick lookup when drawing points
+  const peakIndexSet = new Set(peakIndices);
+
+  // ensure layer group for map peaks exists
+  if (!window.peaksLayerGroup) {
+    window.peaksLayerGroup = L.layerGroup().addTo(map);
+  } else {
+    window.peaksLayerGroup.clearLayers();
+  }
+  
+  // helper to create flag marker
+  function addPeakMarker(p, name) {
+     const flagIcon = L.divIcon({
+        className: '',
+        iconSize: [18, 18],
+        iconAnchor: [9, 18],
+        html: `<i class="fas fa-flag" style="color:#dc3545;font-size:18px;"></i>`
+     });
+     L.marker([p.lat, p.lng], { icon: flagIcon, interactive: false }).addTo(window.peaksLayerGroup).bindTooltip(name, { direction: 'top', offset: [0,-10] });
+  }
+
+  async function enrichPeaks() {
+     for (let i = 0; i < peakIndices.length; i++) {
+        const idx = peakIndices[i];
+        const pt = elevationData[idx];
+        await sleep(1100); // throttle ~1 req/s
+        const name = await fetchPeakName(pt.lat, pt.lng);
+        if (name) {
+           pt.peakName = name;
+           addPeakMarker(pt, name);
+           elevationChart.update();
+        }
+     }
+  }
+  enrichPeaks(); // fire without awaiting
+  // ==== End peak logic ====
+
   // Show the chart section
   chartSection.style.display = 'block';
   chartSection.classList.remove('collapsed'); // Start expanded
@@ -852,7 +891,16 @@ async function createPlanningElevationChart(points) {
         borderWidth: 3,
         fill: true,
         tension: 0.2,
-        pointRadius: 0,
+        pointRadius: (ctx) => {
+          const idx = ctx.dataIndex;
+          const pt = elevationData[idx];
+          return pt && pt.peakName ? 4 : 0;
+        },
+        pointBackgroundColor: (ctx) => {
+          const idx = ctx.dataIndex;
+          const pt = elevationData[idx];
+          return pt && pt.peakName ? '#dc3545' : 'rgba(0,123,255,0)';
+        },
         pointHoverRadius: 6,
         pointHoverBackgroundColor: '#007bff',
         pointHoverBorderColor: '#ffffff',
@@ -877,7 +925,13 @@ async function createPlanningElevationChart(points) {
               return `Distance: ${context[0].label} km`;
             },
             label: function(context) {
-              return `Elevation: ${context.parsed.y.toFixed(0)} m`;
+              const idx = context.dataIndex;
+              const pt = elevationData[idx];
+              const lines = [`Elevation: ${context.parsed.y.toFixed(0)} m`];
+              if (pt && pt.peakName) {
+                lines.push(`Peak: ${pt.peakName}`);
+              }
+              return lines;
             }
           }
         }
@@ -1082,3 +1136,54 @@ function calculateDistanceForProfile(lat1, lng1, lat2, lng2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
+
+// === Peak detection & naming helpers ===
+const peakNameCache = new Map(); // key: "lat,lng" rounded, value: name|null
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Detect local maxima with a simple prominence check (≥50 m by default)
+function detectPeaks(elevArr, prominence = 50) {
+  const peakIdx = [];
+  for (let i = 1; i < elevArr.length - 1; i++) {
+    const prev = elevArr[i - 1].elevation;
+    const curr = elevArr[i].elevation;
+    const next = elevArr[i + 1].elevation;
+    if (curr > prev && curr > next) {
+      const drop = Math.min(curr - prev, curr - next);
+      if (drop >= prominence) peakIdx.push(i);
+    }
+  }
+  return peakIdx;
+}
+
+// Query Overpass API for a named peak near the coordinate (300 m radius)
+async function fetchPeakName(lat, lng) {
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  if (peakNameCache.has(key)) return peakNameCache.get(key);
+
+  const radius = 300; // metres
+  const query = `[out:json][timeout:25];(node(around:${radius},${lat},${lng})[natural=peak][name];node(around:${radius},${lat},${lng})[mountain_pass=yes][name];);out tags 1;`;
+  try {
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
+    const data = await resp.json();
+    if (!data.elements || data.elements.length === 0) {
+      peakNameCache.set(key, null);
+      return null;
+    }
+    // Use the first returned element with a valid name
+    const name = data.elements[0].tags && data.elements[0].tags.name ? data.elements[0].tags.name.trim() : null;
+    if (!name || /^unnamed/i.test(name)) {
+      peakNameCache.set(key, null);
+      return null;
+    }
+    peakNameCache.set(key, name);
+    return name;
+  } catch (e) {
+    console.warn("Overpass query failed:", e);
+    peakNameCache.set(key, null);
+    return null;
+  }
+}
+// === End peak helpers ===
