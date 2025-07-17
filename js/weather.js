@@ -934,15 +934,11 @@ async function createPlanningElevationChart(points) {
               window.planningElevationMarker.setLatLng([profilePoint.lat, profilePoint.lng]);
             }
             
-            // Add a subtle animation
-            const markerElement = window.planningElevationMarker.getElement();
-            if (markerElement) {
-              markerElement.style.transform = 'scale(1.3)';
-              setTimeout(() => {
-                if (markerElement) {
-                  markerElement.style.transform = 'scale(1)';
-                }
-              }, 200);
+            // Simple visual highlight without altering Leaflet's translate3d transform
+            const el = window.planningElevationMarker.getElement();
+            if (el) {
+              el.classList.add('elev-hover-active');
+              setTimeout(() => el.classList.remove('elev-hover-active'), 200);
             }
           }
         }

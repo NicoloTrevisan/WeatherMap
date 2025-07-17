@@ -435,21 +435,23 @@ function createInteractiveElevationChart(profile) {
             // Move the journey marker to the corresponding position on the map
             marker.setLatLng([profilePoint.lat, profilePoint.lng]);
             
-            // Add a subtle animation
-            const markerElement = marker.getElement();
-            if (markerElement) {
-              markerElement.style.transition = 'transform 0.1s ease';
-              markerElement.style.transform = 'scale(1.2)';
+            const el = marker.getElement();
+            if (el) {
+              el.classList.add('elev-hover-active');
+              setTimeout(() => el.classList.remove('elev-hover-active'), 150);
+            }
+          } else {
+            const m = window.journeyMarker || journeyMarker;
+            if (m) {
+              const el = m.getElement();
+              if (el) el.classList.remove('elev-hover-active');
             }
           }
         } else {
-          // Reset marker scale when not hovering
-          const marker = window.journeyMarker || journeyMarker;
-          if (marker) {
-            const markerElement = marker.getElement();
-            if (markerElement) {
-              markerElement.style.transform = 'scale(1)';
-            }
+          const m = window.journeyMarker || journeyMarker;
+          if (m) {
+            const el = m.getElement();
+            if (el) el.classList.remove('elev-hover-active');
           }
         }
       }
