@@ -37,3 +37,12 @@ Cycling Route Planner is a responsive web app that leverages interactive mapping
 - **GraphHopper API:** To generate cycling routes.
 - **OpenWeatherMap API:** To retrieve weather forecasts.
 - **Font Awesome:** For icons used throughout the interface.
+
+## License
+
+This project is dual-licensed.
+
+-   **Non-Commercial Use:** The source code is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](LICENSE). You are free to use, share, and adapt the code for any non-commercial purpose, provided you give attribution and share your derivatives under the same license.
+-   **Commercial Use:** For any use that is primarily intended for commercial advantage or monetary compensation, a separate commercial license must be obtained from the author, Nicolò Trevisan.
+
+Please see the [LICENSE](LICENSE) file for full details.
