@@ -235,6 +235,13 @@ function createPlanningStatsDashboard(metrics) {
       
       <div id="weatherErrorDisplay" class="error-message" style="font-size: 0.9em; margin-top: 10px;"></div>
       <div id="tailwindScoreDisplay" style="margin-top: 15px;"></div>
+
+      <!-- Inline download button -->
+      <div style="text-align:center; margin-top:20px;">
+        <button id="inlineSaveGpxBtn" class="primary-action-button" onclick="saveRouteAsGPX()">
+          <i class="fas fa-download"></i> Download GPX
+        </button>
+      </div>
     </div>
   `;
   

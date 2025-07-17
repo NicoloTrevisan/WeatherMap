@@ -133,15 +133,24 @@ function initMap() {
      if (btn) activeButtons[id] = btn.innerHTML;
   });
 
+  // Hide analyze activity button; flow will auto-analyze on file selection
+  const analyzeBtnInit = document.getElementById('analyzeActivityButton');
+  if (analyzeBtnInit) analyzeBtnInit.style.display = 'none';
+
   // Activity GPX file handling
   document.getElementById('activityGpxFile').addEventListener('change', function(e) {
     const analyzeBtn = document.getElementById('analyzeActivityButton');
     if (e.target.files.length > 0) {
        document.getElementById('activityFileName').textContent = e.target.files[0].name;
-       analyzeBtn.disabled = false;
+       // Hide analyze button and trigger analysis automatically
+       if (analyzeBtn) analyzeBtn.style.display = 'none';
+       analyzeActivity('analyzeActivityButton');
     } else {
        document.getElementById('activityFileName').textContent = "No file selected";
-       analyzeBtn.disabled = true;
+       if (analyzeBtn) {
+         analyzeBtn.disabled = true;
+         analyzeBtn.style.display = '';
+       }
     }
   });
 
@@ -289,6 +298,11 @@ function initWelcomeModal() {
     startAnalyzingButton.addEventListener('click', () => {
       hideWelcomeModal();
       showTab('analyze', document.getElementById('tabAnalyzeBtn'));
+      // Automatically prompt user to choose GPX immediately
+      const loadBtn = document.getElementById('loadActivityButton');
+      if (loadBtn) {
+        loadBtn.click();
+      }
       setTimeout(() => {
         const uploadSection = document.querySelector('#analyze .section');
         if (uploadSection) {
