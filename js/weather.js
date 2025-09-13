@@ -124,7 +124,7 @@ async function analyzeRoute(points) {
         tailwindScoreDisplay.innerHTML = '<span class="loading-text">Calculating tailwind score...</span>';
         try {
             const tailwindScore = await computeTailwindScore(points, startTime, avgSpeed);
-            const tooltipText = `Average headwind (-) or tailwind (+) component in km/h based on forecast along the route. Positive values indicate tailwind (helpful), negative values indicate headwind (hindering). Higher positive values are better.`;
+            const tooltipText = `Average headwind (-) or tailwind (+) component in km/h based on forecast along the route, with yaw-angle dependent crosswind penalty applied. Positive values indicate tailwind (helpful), negative values indicate headwind (hindering). Crosswinds are penalized more heavily as they approach 90° to your direction of travel. Higher positive values are better.`;
             tailwindScoreDisplay.innerHTML = `
               <div style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 8px;">
                 <i class="fas fa-wind" style="color: var(--primary-color); font-size: 18px;"></i>
@@ -353,7 +353,7 @@ function createWeatherMarkers(forecast, point, km, estTime) {
       popupAnchor: [0, -40],
       html: `<div style="text-align:center; position: relative;">
                <div style="transform: rotate(${windDeg}deg); display:inline-block; position: absolute; top: -15px; left: 12px; transform-origin: center bottom;">
-                 <i class="fas fa-long-arrow-alt-down" style="font-size: 20px; color: #0056b3;"></i>
+                 <i class="fas fa-long-arrow-alt-down" style="font-size: 20px; color: #000000;"></i>
                </div>
                <span style="position: absolute; top: 5px; left: 0; width: 100%; font-size: 12px; font-weight: bold; color: #333;">${windSpeed.toFixed(0)}</span>
              </div>`
@@ -608,8 +608,20 @@ async function computeTailwindScore(routePoints, startTime, avgSpeed) {
       while (angleDiffDegrees <= -180) angleDiffDegrees += 360;
       while (angleDiffDegrees > 180) angleDiffDegrees -= 360;
 
+      // Calculate both tailwind and crosswind components
       const tailwindComponent = windSpd_kmh * Math.cos(angleDiffDegrees * Math.PI / 180);
-      return tailwindComponent;
+      const crosswindComponent = Math.abs(windSpd_kmh * Math.sin(angleDiffDegrees * Math.PI / 180));
+      
+      // Calculate yaw-angle dependent penalty factor
+      const yawAngle = Math.abs(angleDiffDegrees);
+      const penaltyFactor = CONFIG.CROSSWIND_PENALTY_MIN + 
+        (yawAngle / 90) * (CONFIG.CROSSWIND_PENALTY_MAX - CONFIG.CROSSWIND_PENALTY_MIN);
+      
+      // Apply crosswind penalty
+      const crosswindPenalty = crosswindComponent * penaltyFactor;
+      const adjustedScore = tailwindComponent - crosswindPenalty;
+      
+      return adjustedScore;
 
     } catch (e) {
       console.error(`Error computing tailwind at sample ${frac*100}%:`, e);

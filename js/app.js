@@ -24,6 +24,8 @@ const CONFIG = {
       TAILWIND_STAGGER_MS: 75 // Delay between weather API calls in computeTailwindScore
   },
   TAILWIND_SAMPLE_FRACTIONS: [0.25, 0.5, 0.75],
+  CROSSWIND_PENALTY_MIN: 0.1, // Minimum penalty factor for crosswind (at 0° yaw)
+  CROSSWIND_PENALTY_MAX: 0.7, // Maximum penalty factor for crosswind (at 90° yaw)
   AUTOCOMPLETE_TYPES: {
       SHORT_QUERY: 'city,town,village',
       LONG_QUERY: 'city,town,village,locality,road'
